@@ -1,9 +1,9 @@
 ---
-name: team-add-role
-description: Add a custom role to the project's codex-team.yaml config.
+name: ateam-add-role
+description: Add a custom role to the project's agenteam.yaml config.
 ---
 
-# Team Add Role
+# AgenTeam Add Role
 
 Add a new custom role to the project configuration.
 
@@ -25,7 +25,7 @@ Ask the user for each field, one at a time:
 
 ### 2. Add to Config
 
-Read the current `codex-team.yaml` and add the new role under `roles:`.
+Read the current `agenteam.yaml` and add the new role under `roles:`.
 
 If the role participates in a pipeline stage, add it to the appropriate
 stage in the `pipeline.stages` section.
@@ -33,12 +33,12 @@ stage in the `pipeline.stages` section.
 ### 3. Regenerate Agents
 
 ```bash
-python3 <runtime>/codex_team_rt.py generate
+python3 <runtime>/agenteam_rt.py generate
 ```
 
 ### 4. Confirm
 
 Show the user:
-- The new role's config as it appears in codex-team.yaml
+- The new role's config as it appears in agenteam.yaml
 - The generated agent file path (`.codex/agents/<name>.toml`)
-- How to use it: `$team-dispatch <name> "<task>"`
+- How to use it: `$ateam-dispatch <name> "<task>"`

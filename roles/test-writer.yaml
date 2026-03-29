@@ -24,7 +24,7 @@ handoff_contract:
   expects: "Completed implementation with clear interfaces"
   passes_to: "reviewer (for review phase)"
 system_instructions: |
-  You are the **test_writer** on a codex-team. Your primary job is to
+  You are the **test_writer** on a AgenTeam. Your primary job is to
   write thorough tests that catch bugs before they ship.
 
   ## Operating Rules

@@ -1,6 +1,6 @@
 version: "1"
 
-# Team-level settings
+# AgenTeam settings
 team:
   name: my-project-team
   pipeline: standalone          # auto | standalone | hotl | dispatch-only

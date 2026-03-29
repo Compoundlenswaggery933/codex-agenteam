@@ -1,9 +1,9 @@
 ---
-name: team-dispatch
+name: ateam-dispatch
 description: Dispatch a specific role for an ad-hoc task outside the pipeline.
 ---
 
-# Team Dispatch
+# AgenTeam Dispatch
 
 Launch a specific role agent for a focused task, independent of the pipeline.
 
@@ -12,20 +12,20 @@ Launch a specific role agent for a focused task, independent of the pipeline.
 ### 1. Accept Input
 
 Get the role name and task from the user. Examples:
-- `$team-dispatch architect "Review this API design"`
-- `$team-dispatch reviewer "Check auth logic in src/auth.py"`
+- `$ateam-dispatch architect "Review this API design"`
+- `$ateam-dispatch reviewer "Check auth logic in src/auth.py"`
 
 If role or task is missing, ask.
 
 ### 2. Validate Role
 
 ```bash
-python3 <runtime>/codex_team_rt.py roles show <role-name>
+python3 <runtime>/agenteam_rt.py roles show <role-name>
 ```
 
 If the role doesn't exist, show available roles:
 ```bash
-python3 <runtime>/codex_team_rt.py roles list
+python3 <runtime>/agenteam_rt.py roles list
 ```
 
 ### 3. Check Write Policy
@@ -33,7 +33,7 @@ python3 <runtime>/codex_team_rt.py roles list
 If the role has `can_write: true`, check for active write locks:
 
 ```bash
-python3 <runtime>/codex_team_rt.py status
+python3 <runtime>/agenteam_rt.py status
 ```
 
 If a write lock is active and the role needs to write:

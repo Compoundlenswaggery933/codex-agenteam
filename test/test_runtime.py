@@ -1,4 +1,4 @@
-"""Unit tests for codex_team_rt.py."""
+"""Unit tests for agenteam_rt.py."""
 
 import json
 import os
@@ -10,13 +10,13 @@ import pytest
 import yaml
 
 # Add runtime to path
-RUNTIME = Path(__file__).resolve().parent.parent / "runtime" / "codex_team_rt.py"
+RUNTIME = Path(__file__).resolve().parent.parent / "runtime" / "agenteam_rt.py"
 ROLES_DIR = Path(__file__).resolve().parent.parent / "roles"
-TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "codex-team.yaml.template"
+TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "agenteam.yaml.template"
 
 
 def run_rt(*args, cwd=None) -> subprocess.CompletedProcess:
-    """Run codex-team-rt with given args."""
+    """Run agenteam-rt with given args."""
     return subprocess.run(
         [sys.executable, str(RUNTIME), *args],
         capture_output=True,
@@ -26,12 +26,12 @@ def run_rt(*args, cwd=None) -> subprocess.CompletedProcess:
 
 
 def make_config(tmp_path: Path, overrides: dict | None = None) -> Path:
-    """Create a codex-team.yaml in tmp_path from template, with optional overrides."""
+    """Create a agenteam.yaml in tmp_path from template, with optional overrides."""
     with open(TEMPLATE) as f:
         config = yaml.safe_load(f)
     if overrides:
         config.update(overrides)
-    config_path = tmp_path / "codex-team.yaml"
+    config_path = tmp_path / "agenteam.yaml"
     with open(config_path, "w") as f:
         yaml.dump(config, f)
     return config_path
@@ -54,7 +54,7 @@ class TestConfigValidation:
         assert r.returncode != 0
 
     def test_invalid_pipeline_mode(self, tmp_path):
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "version": "1",
             "team": {"pipeline": "invalid", "parallel_writes": {"mode": "serial"}},
@@ -68,7 +68,7 @@ class TestConfigValidation:
         assert "Invalid pipeline" in r.stderr
 
     def test_invalid_write_mode(self, tmp_path):
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "version": "1",
             "team": {"pipeline": "standalone", "parallel_writes": {"mode": "invalid"}},
@@ -82,7 +82,7 @@ class TestConfigValidation:
         assert "Invalid parallel_writes.mode" in r.stderr
 
     def test_missing_version(self, tmp_path):
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
         }
@@ -111,7 +111,7 @@ class TestRoleResolution:
     def test_role_override(self, tmp_path):
         make_config(tmp_path)
         # Add a model override for architect
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         with open(config_path) as f:
             config = yaml.safe_load(f)
         config["roles"]["architect"]["model"] = "o4-mini"
@@ -126,7 +126,7 @@ class TestRoleResolution:
         assert "design" in role["participates_in"]
 
     def test_custom_role(self, tmp_path):
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "version": "1",
             "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
@@ -199,7 +199,7 @@ class TestTomlGeneration:
     def test_custom_role_generates_toml(self, tmp_path):
         import toml as toml_lib
 
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "version": "1",
             "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
@@ -242,7 +242,7 @@ class TestInitAndState:
         assert state["stages"]["implement"]["status"] == "pending"
 
         # State file should exist
-        state_dir = tmp_path / ".codex-team" / "state"
+        state_dir = tmp_path / ".agenteam" / "state"
         assert state_dir.exists()
         state_files = list(state_dir.glob("*.json"))
         assert len(state_files) == 1
@@ -306,7 +306,7 @@ class TestDispatch:
         run_id = state["run_id"]
 
         # Simulate active write lock by modifying state
-        state_path = tmp_path / ".codex-team" / "state" / f"{run_id}.json"
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
         state["write_locks"]["active"] = "other_writer"
         with open(state_path, "w") as f:
             json.dump(state, f)
@@ -332,7 +332,7 @@ class TestPolicyCheck:
         assert result["safe_for_parallel"] is True
 
     def test_detects_overlap(self, tmp_path):
-        config_path = tmp_path / "codex-team.yaml"
+        config_path = tmp_path / "agenteam.yaml"
         config = {
             "version": "1",
             "team": {"pipeline": "standalone", "parallel_writes": {"mode": "scoped"}},

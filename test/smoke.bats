@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Smoke tests for codex-team plugin structure
+# Smoke tests for codex-agenteam (AgenTeam) plugin structure
 
 PLUGIN_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 
@@ -28,32 +28,32 @@ print('OK')
 # Skills
 # -----------------------------------------------------------------------
 
-@test "using-codex-team SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/using-codex-team/SKILL.md" ]
+@test "using-agenteam SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/using-agenteam/SKILL.md" ]
 }
 
-@test "team-init SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-init/SKILL.md" ]
+@test "ateam-init SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-init/SKILL.md" ]
 }
 
-@test "team-run SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-run/SKILL.md" ]
+@test "ateam-run SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-run/SKILL.md" ]
 }
 
-@test "team-dispatch SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-dispatch/SKILL.md" ]
+@test "ateam-dispatch SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-dispatch/SKILL.md" ]
 }
 
-@test "team-status SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-status/SKILL.md" ]
+@test "ateam-status SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-status/SKILL.md" ]
 }
 
-@test "team-add-role SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-add-role/SKILL.md" ]
+@test "ateam-add-role SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-add-role/SKILL.md" ]
 }
 
-@test "team-generate SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/team-generate/SKILL.md" ]
+@test "ateam-generate SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/ateam-generate/SKILL.md" ]
 }
 
 # -----------------------------------------------------------------------
@@ -84,8 +84,8 @@ print('OK')
 # Config template
 # -----------------------------------------------------------------------
 
-@test "codex-team.yaml.template exists and is valid YAML" {
-  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/templates/codex-team.yaml.template'))"
+@test "agenteam.yaml.template exists and is valid YAML" {
+  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/templates/agenteam.yaml.template'))"
   [ "$status" -eq 0 ]
 }
 
@@ -93,8 +93,8 @@ print('OK')
 # Runtime
 # -----------------------------------------------------------------------
 
-@test "codex_team_rt.py --help returns 0" {
-  run python3 "$PLUGIN_DIR/runtime/codex_team_rt.py" --help
+@test "agenteam_rt.py --help returns 0" {
+  run python3 "$PLUGIN_DIR/runtime/agenteam_rt.py" --help
   [ "$status" -eq 0 ]
 }
 

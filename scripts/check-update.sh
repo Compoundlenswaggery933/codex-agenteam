@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-update.sh — Best-effort version check for codex-team plugin.
+# check-update.sh — Best-effort version check for codex-agenteam plugin.
 # Outputs to stderr only. Never fails hard.
 
 set -euo pipefail
@@ -21,7 +21,7 @@ if [ "$CURRENT_VERSION" = "unknown" ]; then
 fi
 
 # Check GitHub for latest version (best-effort)
-REPO="yimwoo/codex-team-plugin"
+REPO="yimwoo/codex-agenteam-plugin"
 LATEST=$(curl -sf --max-time 5 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name','').lstrip('v'))" 2>/dev/null \
   || echo "")
@@ -32,7 +32,7 @@ if [ -z "$LATEST" ]; then
 fi
 
 if [ "$CURRENT_VERSION" != "$LATEST" ]; then
-  echo "codex-team update available: $CURRENT_VERSION -> $LATEST" >&2
+  echo "codex-agenteam update available: $CURRENT_VERSION -> $LATEST" >&2
   echo "Update with: cd <plugin-dir> && git pull" >&2
 fi
 

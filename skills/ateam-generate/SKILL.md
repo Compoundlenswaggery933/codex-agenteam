@@ -1,15 +1,15 @@
 ---
-name: team-generate
-description: Regenerate .codex/agents/*.toml from codex-team.yaml and plugin defaults.
+name: ateam-generate
+description: Regenerate .codex/agents/*.toml from agenteam.yaml and plugin defaults.
 ---
 
-# Team Generate
+# AgenTeam Generate
 
 Regenerate Codex-native agent files from the current configuration.
 
 ## When to Use
 
-- After editing `codex-team.yaml` manually
+- After editing `agenteam.yaml` manually
 - After adding or removing roles
 - After updating the plugin (new default role templates)
 - To verify generated agents match the config
@@ -19,7 +19,7 @@ Regenerate Codex-native agent files from the current configuration.
 ### 1. Validate Config
 
 ```bash
-python3 <runtime>/codex_team_rt.py roles list
+python3 <runtime>/agenteam_rt.py roles list
 ```
 
 If this fails, the config has errors — show them and stop.
@@ -27,7 +27,7 @@ If this fails, the config has errors — show them and stop.
 ### 2. Generate Agents
 
 ```bash
-python3 <runtime>/codex_team_rt.py generate
+python3 <runtime>/agenteam_rt.py generate
 ```
 
 ### 3. Report Results

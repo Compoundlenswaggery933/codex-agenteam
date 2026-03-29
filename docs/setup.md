@@ -1,4 +1,4 @@
-# codex-team Setup Guide
+# AgenTeam (codex-agenteam) Setup Guide
 
 ## Prerequisites
 
@@ -18,14 +18,14 @@ pip install pyyaml toml
 
 ```bash
 # From the Codex plugin marketplace (when published)
-codex plugin install codex-team
+codex plugin install codex-agenteam
 ```
 
 ### Manual Installation
 
 ```bash
-git clone https://github.com/yimwoo/codex-team-plugin.git
-cd codex-team-plugin
+git clone https://github.com/yimwoo/codex-agenteam.git
+cd codex-agenteam
 pip install -r runtime/requirements.txt
 ```
 
@@ -38,18 +38,18 @@ Then add the plugin to your Codex configuration as a local plugin.
 Navigate to your project directory and run:
 
 ```
-$team-init
+$ateam-init
 ```
 
 This will:
-- Create `codex-team.yaml` in your project root
+- Create `agenteam.yaml` in your project root
 - Generate `.codex/agents/*.toml` for each role
 - Detect HOTL plugin and suggest integration
 
 ### 2. Run a Task
 
 ```
-$team-run "Add user authentication"
+$ateam-run "Add user authentication"
 ```
 
 This orchestrates the full pipeline:
@@ -62,13 +62,13 @@ This orchestrates the full pipeline:
 ### 3. Dispatch a Role Directly
 
 ```
-$team-dispatch architect "Review this API design"
-$team-dispatch reviewer "Check auth logic in src/auth.py"
+$ateam-dispatch architect "Review this API design"
+$ateam-dispatch reviewer "Check auth logic in src/auth.py"
 ```
 
 ## Configuration Reference
 
-### codex-team.yaml
+### agenteam.yaml
 
 ```yaml
 version: "1"
@@ -126,7 +126,7 @@ pipeline:
 |------|-------------|
 | `standalone` | Built-in pipeline: design -> plan -> implement -> test -> review |
 | `hotl` | Integrates with HOTL plugin for structured workflow execution |
-| `dispatch-only` | No pipeline. Invoke roles ad-hoc via `$team-dispatch` |
+| `dispatch-only` | No pipeline. Invoke roles ad-hoc via `$ateam-dispatch` |
 | `auto` | Detects HOTL and suggests integration. Falls back to standalone. |
 
 ### Write Policy
@@ -139,27 +139,27 @@ pipeline:
 
 ## HOTL Integration
 
-To use codex-team with the HOTL plugin:
+To use AgenTeam with the HOTL plugin:
 
 1. Install the HOTL plugin
-2. Set `pipeline: hotl` in `codex-team.yaml`
-3. Run `$team-run` — codex-team will wrap HOTL skills with role context
+2. Set `pipeline: hotl` in `agenteam.yaml`
+3. Run `$ateam-run` — AgenTeam will wrap HOTL skills with role context
 
 In HOTL mode:
-- codex-team manages role selection and write policy
+- AgenTeam manages role selection and write policy
 - HOTL manages phase execution (loops, verification, gates)
-- codex-team is the outer orchestrator; HOTL is the inner engine
+- AgenTeam is the outer orchestrator; HOTL is the inner engine
 
 ## Available Skills
 
 | Skill | Invocation | Purpose |
 |-------|-----------|---------|
-| team-init | `$team-init` | Set up team config |
-| team-run | `$team-run` | Run full pipeline |
-| team-dispatch | `$team-dispatch` | Dispatch a role |
-| team-status | `$team-status` | Show team state |
-| team-add-role | `$team-add-role` | Add custom role |
-| team-generate | `$team-generate` | Regenerate agents |
+| ateam-init | `$ateam-init` | Set up team config |
+| ateam-run | `$ateam-run` | Run full pipeline |
+| ateam-dispatch | `$ateam-dispatch` | Dispatch a role |
+| ateam-status | `$ateam-status` | Show team state |
+| ateam-add-role | `$ateam-add-role` | Add custom role |
+| ateam-generate | `$ateam-generate` | Regenerate agents |
 
 ## Built-in Roles
 

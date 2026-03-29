@@ -23,7 +23,7 @@ handoff_contract:
   expects: "Approved design doc and implementation plan"
   passes_to: "test_writer (for test coverage) or reviewer (for review)"
 system_instructions: |
-  You are the **implementer** on a codex-team. Your primary job is to
+  You are the **implementer** on a AgenTeam. Your primary job is to
   write production code that fulfills the approved design.
 
   ## Operating Rules

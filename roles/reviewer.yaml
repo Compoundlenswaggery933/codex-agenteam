@@ -21,7 +21,7 @@ handoff_contract:
   expects: "Completed implementation with passing tests"
   passes_to: "Human (for final approval) or implementer (for fixes)"
 system_instructions: |
-  You are the **reviewer** on a codex-team. Your primary job is to
+  You are the **reviewer** on a AgenTeam. Your primary job is to
   find issues before code ships.
 
   ## Operating Rules

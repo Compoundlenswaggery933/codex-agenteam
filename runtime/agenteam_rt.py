@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""codex-team runtime engine.
+"""AgenTeam (codex-agenteam) runtime engine.
 
 Pure config-resolver and policy-enforcer. Outputs JSON.
 Skills own subagent execution.
@@ -40,16 +40,16 @@ ROLES_DIR = PLUGIN_DIR / "roles"
 # ---------------------------------------------------------------------------
 
 def find_config(directory: str | None = None) -> Path:
-    """Locate codex-team.yaml in the given or current directory."""
+    """Locate agenteam.yaml in the given or current directory."""
     d = Path(directory) if directory else Path.cwd()
-    path = d / "codex-team.yaml"
+    path = d / "agenteam.yaml"
     if not path.exists():
-        raise FileNotFoundError(f"codex-team.yaml not found in {d}")
+        raise FileNotFoundError(f"agenteam.yaml not found in {d}")
     return path
 
 
 def load_config(path: Path) -> dict:
-    """Load and validate codex-team.yaml."""
+    """Load and validate agenteam.yaml."""
     with open(path) as f:
         config = yaml.safe_load(f)
     validate_config(config)
@@ -213,7 +213,7 @@ def cmd_init(args, config: dict) -> None:
     run_id = generate_run_id()
 
     # Create state directory
-    state_dir = Path.cwd() / ".codex-team" / "state"
+    state_dir = Path.cwd() / ".agenteam" / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
 
     # Build initial state
@@ -249,7 +249,7 @@ def cmd_init(args, config: dict) -> None:
 
 def find_latest_state() -> dict | None:
     """Find the most recent state file."""
-    state_dir = Path.cwd() / ".codex-team" / "state"
+    state_dir = Path.cwd() / ".agenteam" / "state"
     if not state_dir.exists():
         return None
     files = sorted(state_dir.glob("*.json"), reverse=True)
@@ -262,7 +262,7 @@ def find_latest_state() -> dict | None:
 def cmd_status(args, config: dict) -> None:
     """Show current run status."""
     if args.run_id:
-        state_path = Path.cwd() / ".codex-team" / "state" / f"{args.run_id}.json"
+        state_path = Path.cwd() / ".agenteam" / "state" / f"{args.run_id}.json"
         if not state_path.exists():
             print(json.dumps({"error": f"Run {args.run_id} not found"}), file=sys.stderr)
             sys.exit(1)
@@ -304,7 +304,7 @@ def cmd_dispatch(args, config: dict) -> None:
     # Load current state for write locks
     state = None
     if args.run_id:
-        state_path = Path.cwd() / ".codex-team" / "state" / f"{args.run_id}.json"
+        state_path = Path.cwd() / ".agenteam" / "state" / f"{args.run_id}.json"
         if state_path.exists():
             with open(state_path) as f:
                 state = json.load(f)
@@ -423,10 +423,10 @@ def cmd_hotl_check(args, config: dict | None = None) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="codex-team-rt",
-        description="codex-team runtime engine",
+        prog="agenteam-rt",
+        description="AgenTeam (codex-agenteam) runtime engine",
     )
-    parser.add_argument("--config", help="Path to codex-team.yaml")
+    parser.add_argument("--config", help="Path to agenteam.yaml")
 
     sub = parser.add_subparsers(dest="command")
 

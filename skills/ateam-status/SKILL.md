@@ -1,9 +1,9 @@
 ---
-name: team-status
-description: Show the current state of a team run — stages, roles, write locks, and gates.
+name: ateam-status
+description: Show the current state of an AgenTeam run — stages, roles, write locks, and gates.
 ---
 
-# Team Status
+# AgenTeam Status
 
 Display the current state of the team's work.
 
@@ -12,7 +12,7 @@ Display the current state of the team's work.
 ### 1. Get Status
 
 ```bash
-python3 <runtime>/codex_team_rt.py status
+python3 <runtime>/agenteam_rt.py status
 ```
 
 ### 2. Format Output
@@ -20,7 +20,7 @@ python3 <runtime>/codex_team_rt.py status
 Display the run state in a readable format:
 
 ```
-Team: <team-name>
+AgenTeam: <team-name>
 Pipeline: <mode>
 Task: <task description>
 Run: <run-id>
@@ -40,9 +40,9 @@ Queue: (empty)
 ### 3. No Active Run
 
 If no run is found, show:
-- Team config status (does codex-team.yaml exist?)
+- Team config status (does agenteam.yaml exist?)
 - Available roles
-- Suggestion: "Use `$team-run` to start a new task."
+- Suggestion: "Use `$ateam-run` to start a new task."
 
 ## Symbols
 

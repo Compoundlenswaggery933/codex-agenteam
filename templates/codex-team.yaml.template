@@ -1,0 +1,78 @@
+version: "1"
+
+# Team-level settings
+team:
+  name: my-project-team
+  pipeline: standalone          # auto | standalone | hotl | dispatch-only
+
+  parallel_writes:
+    mode: serial                # serial | scoped | worktree (v2+)
+
+# Role overrides (deep-merged with plugin defaults)
+# Uncomment and modify to customize built-in roles
+roles:
+  architect:
+    model: o3
+    reasoning_effort: high
+
+  implementer:
+    can_write: true
+    write_scope:
+      - "src/**"
+      - "lib/**"
+
+  test_writer:
+    can_write: true
+    write_scope:
+      - "tests/**"
+      - "**/*.test.*"
+
+  reviewer:
+    can_write: false
+    participates_in:
+      - review
+
+  # Custom role example — uncomment and modify to add your own
+  # security_auditor:
+  #   base_agent: default
+  #   description: "Reviews code for security vulnerabilities"
+  #   responsibilities:
+  #     - "Check for OWASP top 10 vulnerabilities"
+  #     - "Review auth/authz logic"
+  #     - "Flag hardcoded secrets"
+  #   participates_in:
+  #     - review
+  #   model: o3
+  #   reasoning_effort: high
+  #   can_write: false
+  #   parallel_safe: true
+  #   system_instructions: |
+  #     You are a security auditor. Focus exclusively on security concerns.
+
+# Standalone pipeline stages (used when pipeline != hotl)
+pipeline:
+  stages:
+    - name: design
+      roles:
+        - architect
+      gate: human
+
+    - name: plan
+      roles:
+        - architect
+      gate: human
+
+    - name: implement
+      roles:
+        - implementer
+      gate: auto
+
+    - name: test
+      roles:
+        - test_writer
+      gate: auto
+
+    - name: review
+      roles:
+        - reviewer
+      gate: human

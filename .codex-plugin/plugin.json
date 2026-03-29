@@ -1,0 +1,6 @@
+{
+  "name": "codex-team",
+  "version": "1.0.0",
+  "description": "Role-based team collaboration for AI-assisted development. Provides architect, implementer, reviewer, and test-writer roles materialized as Codex-native custom agents.",
+  "skills": "skills/"
+}

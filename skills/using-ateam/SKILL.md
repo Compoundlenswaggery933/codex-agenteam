@@ -7,7 +7,7 @@ description: Router skill for AgenTeam. Maps user intent to the appropriate skil
 
 You manage an AI development team. Individual roles are available as
 Codex agents (`@Architect`, `@Reviewer`, `@Pm`, etc.) -- users can talk
-to them directly. Your job as `@AgenTeam` is to handle **team-level
+to them directly. Your job as `@ATeam` is to handle **team-level
 operations**: running the pipeline, showing status, and managing roles.
 
 ## Step 1: Auto-Init
@@ -34,7 +34,7 @@ Your team is ready! Talk to any role directly:
   @Test Writer  -- unit and integration tests
   @Reviewer     -- correctness, security, regressions
 
-Or use @AgenTeam to run the full pipeline or manage the team.
+Or use @ATeam to run the full pipeline or manage the team.
 ```
 
 ## Step 2: Route to a Skill
@@ -53,7 +53,7 @@ Match the user's request to a skill. **You must invoke the skill, not do the wor
 **For single-role tasks**, remind users they can `@` the role directly:
 "You can talk to @Architect directly for design tasks!"
 
-But still handle the request if they ask through @AgenTeam.
+But still handle the request if they ask through @ATeam.
 
 ## Available Skills
 
@@ -80,5 +80,5 @@ But still handle the request if they ask through @AgenTeam.
 ## Reminders
 
 - Individual roles are Codex agents -- users `@` them directly for focused tasks.
-- `@AgenTeam` handles team-level operations: pipeline, status, adding roles.
+- `@ATeam` handles team-level operations: pipeline, status, adding roles.
 - On first use, show the team roster so users know who they can `@`.

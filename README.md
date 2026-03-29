@@ -39,7 +39,7 @@ Talk to any role directly:
 Or run the full pipeline through the plugin:
 
 ```
-@AgenTeam run the full pipeline on: add user authentication
+@ATeam run the full pipeline on: add user authentication
 ```
 
 That's it. Install, then `@` your team.
@@ -61,15 +61,15 @@ In the Codex App, `@` any team member directly:
 @Researcher what are others doing for rate limiting?
 ```
 
-### Team Operations via @AgenTeam
+### Team Operations via @ATeam
 
-Use `@AgenTeam` for team-level operations:
+Use `@ATeam` for team-level operations:
 
 ```
-@AgenTeam run the full pipeline on: add rate limiting to the API
-@AgenTeam show team status
-@AgenTeam add a security auditor that focuses on OWASP top 10
-@AgenTeam add a performance engineer to profile API response times
+@ATeam run the full pipeline on: add rate limiting to the API
+@ATeam show team status
+@ATeam add a security auditor that focuses on OWASP top 10
+@ATeam add a performance engineer to profile API response times
 ```
 
 ### Codex CLI
@@ -106,7 +106,7 @@ $ateam:generate
 
 **Add a specialist:**
 ```
-@AgenTeam add a security auditor that focuses on auth and data leaks
+@ATeam add a security auditor that focuses on auth and data leaks
 ```
 AgenTeam infers the role config, confirms with you, writes to `agenteam.yaml`, and generates the agent. Then `@` them directly:
 ```

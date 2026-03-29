@@ -24,7 +24,7 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "AgenTeam",
+    "displayName": "ATeam",
     "shortDescription": "Role-based AI team -- research, strategize, design, implement, test, review.",
     "longDescription": "AgenTeam organizes AI-assisted development into specialist roles (researcher, pm, architect, implementer, test-writer, reviewer) materialized as Codex-native custom agents. Configure pipelines, write policies, and custom roles via agenteam.yaml.",
     "developerName": "Yiming Wu",

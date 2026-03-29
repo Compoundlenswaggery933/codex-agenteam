@@ -189,7 +189,24 @@ def cmd_generate(args, config: dict) -> None:
             f.write(toml_content)
         generated.append(str(out_path))
 
-    print(json.dumps({"generated": generated}))
+    result = {"generated": generated}
+
+    count = len(generated)
+    warnings = []
+    if count > 6:
+        warnings.append(
+            f"You have {count} agents. Codex defaults to 6 concurrent threads. "
+            "Set agents.max_threads in your Codex config.toml to run more in parallel."
+        )
+    if count > 12:
+        warnings.append(
+            f"You have {count} agents. Teams above 12 can increase coordination "
+            "overhead. Consider consolidating roles with overlapping responsibilities."
+        )
+    if warnings:
+        result["warnings"] = warnings
+
+    print(json.dumps(result))
 
 
 # ---------------------------------------------------------------------------

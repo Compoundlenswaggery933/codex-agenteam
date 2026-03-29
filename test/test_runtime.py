@@ -320,6 +320,62 @@ class TestDispatch:
         assert len(plan["blocked"]) > 0
         assert plan["blocked"][0]["role"] == "implementer"
 
+    def test_e2e_default_pipeline_dispatches_all_six_builtin_roles(self, tmp_path):
+        """Walk the default pipeline and verify all built-in agents are dispatched."""
+        make_config(tmp_path)
+
+        generate_r = run_rt("generate", cwd=str(tmp_path))
+        assert generate_r.returncode == 0
+
+        init_r = run_rt("init", "--task", "ship a collaborative feature", cwd=str(tmp_path))
+        assert init_r.returncode == 0
+        state = json.loads(init_r.stdout)
+        run_id = state["run_id"]
+
+        dispatched_roles = set()
+        stage_dispatch_counts = {}
+
+        for stage_name in [
+            "research",
+            "strategy",
+            "design",
+            "plan",
+            "implement",
+            "test",
+            "review",
+        ]:
+            r = run_rt(
+                "dispatch",
+                stage_name,
+                "--task",
+                "ship a collaborative feature",
+                "--run-id",
+                run_id,
+                cwd=str(tmp_path),
+            )
+            assert r.returncode == 0, f"dispatch failed for stage {stage_name}: {r.stderr}"
+            plan = json.loads(r.stdout)
+
+            assert plan["stage"] == stage_name
+            assert plan["blocked"] == []
+            assert plan["dispatch"], f"expected dispatch entries for stage {stage_name}"
+
+            stage_dispatch_counts[stage_name] = len(plan["dispatch"])
+            for entry in plan["dispatch"]:
+                dispatched_roles.add(entry["role"])
+                assert (tmp_path / entry["agent"]).exists()
+                assert entry["task"] == "ship a collaborative feature"
+
+        assert dispatched_roles == {
+            "researcher",
+            "pm",
+            "architect",
+            "implementer",
+            "test_writer",
+            "reviewer",
+        }
+        assert stage_dispatch_counts["design"] == 3
+
 
 # ---------------------------------------------------------------------------
 # Policy check

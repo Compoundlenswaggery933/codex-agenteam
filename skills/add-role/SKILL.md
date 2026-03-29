@@ -43,7 +43,25 @@ Infer as much as possible from the description:
 | `reasoning_effort` | high for analysis roles, medium for writing roles |
 | `system_instructions` | Generate focused instructions from the role's domain |
 
-### 3. Confirm with User
+### 3. Team Size Check
+
+Before confirming, count the current roles:
+
+```bash
+python3 <runtime>/agenteam_rt.py roles list
+```
+
+- **7-12 roles**: No warning. This is the productive range.
+- **13+ roles**: Warn the user:
+  "Your team will have [N] roles. Teams above 12 can increase coordination
+  overhead and make role selection harder. Consider extending an existing
+  role's `system_instructions` instead. Proceed anyway? (yes / cancel)"
+
+Also check: if the team will have more than 6 roles, note:
+"Codex defaults to 6 concurrent agent threads. To run more agents in
+parallel, set `agents.max_threads` in your Codex config.toml."
+
+### 4. Confirm with User
 
 Present the inferred role as a summary and ask for confirmation:
 
@@ -66,7 +84,7 @@ Add to team? (yes / adjust)
 If the user says "adjust" or requests changes, update the fields and
 re-confirm. Do not ask field-by-field -- keep it conversational.
 
-### 4. Write to Config
+### 5. Write to Config
 
 Read the current `agenteam.yaml` and add the new role under `roles:`.
 
@@ -82,13 +100,13 @@ Write the full role block including:
 If the role participates in a pipeline stage, also add it to the
 appropriate `pipeline.stages[].roles` list.
 
-### 5. Regenerate Agents
+### 6. Regenerate Agents
 
 ```bash
 python3 <runtime>/agenteam_rt.py generate
 ```
 
-### 6. Confirm
+### 7. Confirm
 
 Show the user:
 - The generated agent file: `.codex/agents/<name>.toml`

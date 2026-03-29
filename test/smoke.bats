@@ -28,37 +28,47 @@ print('OK')
 # Skills
 # -----------------------------------------------------------------------
 
-@test "using-agenteam SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/using-agenteam/SKILL.md" ]
+@test "using-ateam SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/using-ateam/SKILL.md" ]
 }
 
-@test "ateam-init SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-init/SKILL.md" ]
+@test "init SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/init/SKILL.md" ]
 }
 
-@test "ateam-run SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-run/SKILL.md" ]
+@test "run SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/run/SKILL.md" ]
 }
 
-@test "ateam-assign SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-assign/SKILL.md" ]
+@test "assign SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/assign/SKILL.md" ]
 }
 
-@test "ateam-status SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-status/SKILL.md" ]
+@test "status SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/status/SKILL.md" ]
 }
 
-@test "ateam-add-role SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-add-role/SKILL.md" ]
+@test "add-role SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/add-role/SKILL.md" ]
 }
 
-@test "ateam-generate SKILL.md exists and is non-empty" {
-  [ -s "$PLUGIN_DIR/skills/ateam-generate/SKILL.md" ]
+@test "generate SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/generate/SKILL.md" ]
 }
 
 # -----------------------------------------------------------------------
 # Role templates
 # -----------------------------------------------------------------------
+
+@test "researcher.yaml exists and is valid YAML" {
+  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/researcher.yaml'))"
+  [ "$status" -eq 0 ]
+}
+
+@test "pm.yaml exists and is valid YAML" {
+  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/pm.yaml'))"
+  [ "$status" -eq 0 ]
+}
 
 @test "architect.yaml exists and is valid YAML" {
   run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/architect.yaml'))"

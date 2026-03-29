@@ -1,5 +1,5 @@
 ---
-name: ateam-assign
+name: assign
 description: Assign a task to a specific role on your team.
 ---
 
@@ -20,8 +20,8 @@ Check for `agenteam.yaml` in the project root. If missing:
 ### 2. Accept Input
 
 Get the role name and task from the user. Examples:
-- `$ateam-assign architect "Review this API design"`
-- `$ateam-assign reviewer "Check auth logic in src/auth.py"`
+- `$ateam:assign architect "Review this API design"`
+- `$ateam:assign reviewer "Check auth logic in src/auth.py"`
 - `@ateam assign researcher to investigate caching strategies`
 - `@ateam ask pm what we should build next`
 

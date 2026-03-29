@@ -1,6 +1,6 @@
 ---
-name: ateam-init
-description: Initialize AgenTeam config for a project. Creates agenteam.yaml and generates .codex/agents/*.toml.
+name: init
+description: Initialize team config for a project. Creates agenteam.yaml and generates .codex/agents/*.toml.
 ---
 
 # AgenTeam Init
@@ -87,8 +87,8 @@ If HOTL is available and pipeline is not already set to `hotl`:
 Show:
 - Config file location
 - Generated agent files
-- Available skills (`$ateam-run`, `$ateam-assign`, etc.)
-- Next step suggestion: "Run `$ateam-run` to start a task with your team."
+- Available skills (`$ateam:run`, `$ateam:assign`, etc.)
+- Next step suggestion: "Run `$ateam:run` to start a task with your team."
 
 ## Runtime Path Resolution
 

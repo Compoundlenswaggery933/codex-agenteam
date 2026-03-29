@@ -31,7 +31,7 @@ AgenTeam auto-initializes with default roles on first use, then orchestrates the
 
 That's it. Two steps: install, use.
 
-> Want to customize roles, models, or the pipeline? Edit `agenteam.yaml` in your project root, or run `$ateam-init` for guided setup.
+> Want to customize roles, models, or the pipeline? Edit `agenteam.yaml` in your project root, or run `$ateam:init` for guided setup.
 
 ## Usage Examples
 
@@ -65,36 +65,36 @@ In the CLI, use skill invocations directly:
 
 ```bash
 # Run the full design-plan-implement-test-review pipeline
-$ateam-run "Refactor the database layer to use connection pooling"
+$ateam:run "Refactor the database layer to use connection pooling"
 
 # Dispatch a single role for a focused task
-$ateam-assign architect "Propose an approach for caching"
-$ateam-assign implementer "Implement the caching layer per the approved plan"
-$ateam-assign test_writer "Add integration tests for the cache"
-$ateam-assign reviewer "Review the caching implementation"
+$ateam:assign architect "Propose an approach for caching"
+$ateam:assign implementer "Implement the caching layer per the approved plan"
+$ateam:assign test_writer "Add integration tests for the cache"
+$ateam:assign reviewer "Review the caching implementation"
 
 # Check what the team is working on
-$ateam-status
+$ateam:status
 
 # Add a custom role
-$ateam-add-role
+$ateam:add-role
 
 # Regenerate agent TOML files after config changes
-$ateam-generate
+$ateam:generate
 ```
 
 ### Real-World Scenarios
 
 **Bug fix with review:**
 ```
-$ateam-assign implementer "Fix the race condition in src/queue.py -- see issue #42"
-$ateam-assign test_writer "Add a regression test for the queue race condition"
-$ateam-assign reviewer "Review the queue fix and test"
+$ateam:assign implementer "Fix the race condition in src/queue.py -- see issue #42"
+$ateam:assign test_writer "Add a regression test for the queue race condition"
+$ateam:assign reviewer "Review the queue fix and test"
 ```
 
 **Architecture decision:**
 ```
-$ateam-assign architect "We need to choose between REST and GraphQL for the new API. Analyze trade-offs for our use case."
+$ateam:assign architect "We need to choose between REST and GraphQL for the new API. Analyze trade-offs for our use case."
 ```
 
 **Add a specialist to your team:**
@@ -192,7 +192,7 @@ pipeline:
 |------|----------|
 | `standalone` | Built-in pipeline: design -> plan -> implement -> test -> review |
 | `hotl` | Integrates with [HOTL plugin](https://github.com/yimwoo/hotl) for structured workflow execution |
-| `dispatch-only` | No pipeline -- invoke roles ad-hoc via `$ateam-assign` |
+| `dispatch-only` | No pipeline -- invoke roles ad-hoc via `$ateam:assign` |
 | `auto` | Detects HOTL availability and suggests integration; falls back to standalone |
 
 ### Write Policy

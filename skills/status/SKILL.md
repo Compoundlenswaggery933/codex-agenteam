@@ -1,6 +1,6 @@
 ---
-name: ateam-status
-description: Show the current state of an AgenTeam run — stages, roles, write locks, and gates.
+name: status
+description: Show the current state of a run — stages, roles, write locks, and gates.
 ---
 
 # AgenTeam Status
@@ -42,7 +42,7 @@ Queue: (empty)
 If no run is found, show:
 - Team config status (does agenteam.yaml exist?)
 - Available roles
-- Suggestion: "Use `$ateam-run` to start a new task."
+- Suggestion: "Use `$ateam:run` to start a new task."
 
 ## Symbols
 

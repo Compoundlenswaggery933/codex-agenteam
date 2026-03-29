@@ -1,5 +1,5 @@
 ---
-name: ateam-add-role
+name: add-role
 description: Add a custom role to the project's agenteam.yaml config. Accepts natural language descriptions.
 ---
 
@@ -94,5 +94,5 @@ Show the user:
 - The generated agent file: `.codex/agents/<name>.toml`
 - How to use it immediately:
   - Codex App: `@ateam ask <name> to <task>`
-  - Codex CLI: `$ateam-assign <name> "<task>"`
+  - Codex CLI: `$ateam:assign <name> "<task>"`
 - Reminder: "Edit `agenteam.yaml` anytime to adjust this role."

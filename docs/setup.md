@@ -37,7 +37,7 @@ bash install.sh --local
 Navigate to your project directory and run:
 
 ```
-$ateam-init
+$ateam:init
 ```
 
 This will:
@@ -48,7 +48,7 @@ This will:
 ### 2. Run a Task
 
 ```
-$ateam-run "Add user authentication"
+$ateam:run "Add user authentication"
 ```
 
 This orchestrates the full pipeline:
@@ -61,8 +61,8 @@ This orchestrates the full pipeline:
 ### 3. Dispatch a Role Directly
 
 ```
-$ateam-assign architect "Review this API design"
-$ateam-assign reviewer "Check auth logic in src/auth.py"
+$ateam:assign architect "Review this API design"
+$ateam:assign reviewer "Check auth logic in src/auth.py"
 ```
 
 ## Configuration Reference
@@ -125,7 +125,7 @@ pipeline:
 |------|-------------|
 | `standalone` | Built-in pipeline: design -> plan -> implement -> test -> review |
 | `hotl` | Integrates with HOTL plugin for structured workflow execution |
-| `dispatch-only` | No pipeline. Invoke roles ad-hoc via `$ateam-assign` |
+| `dispatch-only` | No pipeline. Invoke roles ad-hoc via `$ateam:assign` |
 | `auto` | Detects HOTL and suggests integration. Falls back to standalone. |
 
 ### Write Policy
@@ -142,7 +142,7 @@ To use AgenTeam with the HOTL plugin:
 
 1. Install the HOTL plugin
 2. Set `pipeline: hotl` in `agenteam.yaml`
-3. Run `$ateam-run` — AgenTeam will wrap HOTL skills with role context
+3. Run `$ateam:run` — AgenTeam will wrap HOTL skills with role context
 
 In HOTL mode:
 - AgenTeam manages role selection and write policy
@@ -153,12 +153,12 @@ In HOTL mode:
 
 | Skill | Invocation | Purpose |
 |-------|-----------|---------|
-| ateam-init | `$ateam-init` | Set up team config |
-| ateam-run | `$ateam-run` | Run full pipeline |
-| ateam-assign | `$ateam-assign` | Assign a task to a role |
-| ateam-status | `$ateam-status` | Show team state |
-| ateam-add-role | `$ateam-add-role` | Add custom role |
-| ateam-generate | `$ateam-generate` | Regenerate agents |
+| init | `$ateam:init` | Set up team config |
+| run | `$ateam:run` | Run full pipeline |
+| assign | `$ateam:assign` | Assign a task to a role |
+| status | `$ateam:status` | Show team state |
+| add-role | `$ateam:add-role` | Add custom role |
+| generate | `$ateam:generate` | Regenerate agents |
 
 ## Built-in Roles
 

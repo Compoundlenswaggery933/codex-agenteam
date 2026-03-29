@@ -1,5 +1,5 @@
 ---
-name: ateam-generate
+name: generate
 description: Regenerate .codex/agents/*.toml from agenteam.yaml and plugin defaults.
 ---
 

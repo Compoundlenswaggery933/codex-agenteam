@@ -1,6 +1,6 @@
 ---
-name: ateam-run
-description: Run a full AgenTeam pipeline for a task. Orchestrates roles through stages (standalone or HOTL-integrated).
+name: run
+description: Run a full pipeline for a task. Orchestrates roles through stages (standalone or HOTL-integrated).
 ---
 
 # AgenTeam Run
@@ -39,7 +39,7 @@ Read `pipeline_mode` from the run state:
 - **standalone** -> Run the built-in pipeline (step 4)
 - **hotl** -> Run the HOTL wrapper pipeline (step 5)
 - **dispatch-only** -> Tell the user: "Pipeline is dispatch-only. Use
-  `$ateam-assign <role> <task>` to assign tasks to specific roles."
+  `$ateam:assign <role> <task>` to assign tasks to specific roles."
 - **auto** -> Check HOTL availability. If available, ask the user:
   "HOTL detected. Run with HOTL integration? (yes/no)". If yes, use HOTL
   mode. If no, use standalone mode.

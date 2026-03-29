@@ -1,6 +1,6 @@
 ---
-name: using-agenteam
-description: Router skill for AgenTeam plugin. Maps user intent to the appropriate skill.
+name: using-ateam
+description: Router skill for AgenTeam. Maps user intent to the appropriate skill and role.
 ---
 
 # AgenTeam Router
@@ -31,31 +31,31 @@ Match the user's request to a skill. **You must invoke the skill, not do the wor
 
 | User Says | Invoke | Role |
 |-----------|--------|------|
-| "code review", "review this", "check this code" | `$ateam-assign` | reviewer |
-| "review the design", "critique this plan" | `$ateam-assign` | architect |
-| "what should we build", "prioritize", "write a spec" | `$ateam-assign` | pm |
-| "research X", "what's out there", "investigate" | `$ateam-assign` | researcher |
-| "implement X", "build this", "fix this bug" | `$ateam-assign` | implementer |
-| "write tests", "add test coverage" | `$ateam-assign` | test_writer |
-| "add a role", "add a member", "new team member" | `$ateam-add-role` | -- |
-| "run the pipeline", "full workflow on X" | `$ateam-run` | -- |
-| "set up team", "initialize", "configure" | `$ateam-init` | -- |
-| "status", "progress", "what's happening" | `$ateam-status` | -- |
-| "regenerate agents", "sync agents" | `$ateam-generate` | -- |
+| "code review", "review this", "check this code" | `$ateam:assign` | reviewer |
+| "review the design", "critique this plan" | `$ateam:assign` | architect |
+| "what should we build", "prioritize", "write a spec" | `$ateam:assign` | pm |
+| "research X", "what's out there", "investigate" | `$ateam:assign` | researcher |
+| "implement X", "build this", "fix this bug" | `$ateam:assign` | implementer |
+| "write tests", "add test coverage" | `$ateam:assign` | test_writer |
+| "add a role", "add a member", "new team member" | `$ateam:add-role` | -- |
+| "run the pipeline", "full workflow on X" | `$ateam:run` | -- |
+| "set up team", "initialize", "configure" | `$ateam:init` | -- |
+| "status", "progress", "what's happening" | `$ateam:status` | -- |
+| "regenerate agents", "sync agents" | `$ateam:generate` | -- |
 
-If the request doesn't clearly match a single role, use `$ateam-run` to
+If the request doesn't clearly match a single role, use `$ateam:run` to
 run the full pipeline.
 
 ## Available Skills
 
 | Skill | Invoke | Purpose |
 |-------|--------|---------|
-| ateam-assign | `$ateam-assign` | Assign a task to a specific role |
-| ateam-run | `$ateam-run` | Run the full pipeline for a task |
-| ateam-init | `$ateam-init` | Guided team setup |
-| ateam-status | `$ateam-status` | Show team state and progress |
-| ateam-add-role | `$ateam-add-role` | Add a custom role to the team |
-| ateam-generate | `$ateam-generate` | Regenerate .codex/agents/*.toml |
+| ateam-assign | `$ateam:assign` | Assign a task to a specific role |
+| ateam-run | `$ateam:run` | Run the full pipeline for a task |
+| ateam-init | `$ateam:init` | Guided team setup |
+| ateam-status | `$ateam:status` | Show team state and progress |
+| ateam-add-role | `$ateam:add-role` | Add a custom role to the team |
+| ateam-generate | `$ateam:generate` | Regenerate .codex/agents/*.toml |
 
 ## Built-in Roles
 
@@ -71,6 +71,6 @@ run the full pipeline.
 ## Reminders
 
 - **You are the lead, not a worker.** Route every task to a role.
-- If a user says "ask X to do Y", route to `$ateam-assign` with role X.
+- If a user says "ask X to do Y", route to `$ateam:assign` with role X.
 - If a user says "do Y", infer the best role from the table above.
 - The pipeline is: research -> strategy -> design -> plan -> implement -> test -> review.

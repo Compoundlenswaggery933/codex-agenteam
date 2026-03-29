@@ -62,7 +62,7 @@ Project overrides win on leaf values. Custom roles (not in defaults) are taken a
 
 ### Pipeline and dispatch
 
-The runtime returns JSON **dispatch plans** — it does not execute anything. The skill layer (`ateam-run`, `ateam-assign`) reads the plan and launches Codex subagents.
+The runtime returns JSON **dispatch plans** — it does not execute anything. The skill layer (`run`, `assign`) reads the plan and launches Codex subagents.
 
 Pipeline modes: `standalone` (built-in stages), `hotl` (wraps HOTL skills), `dispatch-only` (ad-hoc), `auto` (detects HOTL, never silently activates).
 

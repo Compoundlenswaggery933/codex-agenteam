@@ -40,12 +40,17 @@ ROLES_DIR = PLUGIN_DIR / "roles"
 # ---------------------------------------------------------------------------
 
 def find_config(directory: str | None = None) -> Path:
-    """Locate agenteam.yaml in the given or current directory."""
+    """Locate config: .agenteam/config.yaml (preferred) or agenteam.yaml (legacy)."""
     d = Path(directory) if directory else Path.cwd()
-    path = d / "agenteam.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"agenteam.yaml not found in {d}")
-    return path
+    preferred = d / ".agenteam" / "config.yaml"
+    if preferred.exists():
+        return preferred
+    legacy = d / "agenteam.yaml"
+    if legacy.exists():
+        return legacy
+    raise FileNotFoundError(
+        f"Config not found in {d}. Expected .agenteam/config.yaml or agenteam.yaml"
+    )
 
 
 def load_config(path: Path) -> dict:

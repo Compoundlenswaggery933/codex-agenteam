@@ -39,7 +39,8 @@ Look for `agenteam.yaml` in the project root.
 Copy the template and prompt for customization:
 
 ```bash
-cp <plugin-dir>/templates/agenteam.yaml.template agenteam.yaml
+mkdir -p .agenteam
+cp <plugin-dir>/templates/agenteam.yaml.template .agenteam/config.yaml
 ```
 
 Ask the user (one question at a time):

@@ -12,13 +12,14 @@ operations**: running the pipeline, showing status, and managing roles.
 
 ## Step 1: Auto-Init
 
-Check if `agenteam.yaml` exists in the project root.
+Check if `.agenteam/config.yaml` (or legacy `agenteam.yaml`) exists in the project root.
 
 **If missing**, initialize immediately:
 
 ```bash
 PLUGIN_DIR="$(find ~/.codex/plugins/cache -name 'ateam' -type d 2>/dev/null | head -1)"
-cp "$PLUGIN_DIR/templates/agenteam.yaml.template" agenteam.yaml
+mkdir -p .agenteam
+cp "$PLUGIN_DIR/templates/agenteam.yaml.template" .agenteam/config.yaml
 python3 "$PLUGIN_DIR/runtime/agenteam_rt.py" generate
 ```
 

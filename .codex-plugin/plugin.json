@@ -1,7 +1,7 @@
 {
   "name": "ateam",
   "version": "1.0.1",
-  "description": "AgenTeam: Role-based AI team collaboration. Researcher, PM, architect, implementer, test-writer, and reviewer -- orchestrated through a configurable pipeline.",
+  "description": "Role-based AI team collaboration for Codex. 6 specialist roles orchestrated through a configurable pipeline.",
   "author": {
     "name": "Yiming Wu",
     "url": "https://github.com/yimwoo"
@@ -25,13 +25,13 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "ATeam",
-    "shortDescription": "Role-based AI team -- research, strategize, design, implement, test, review.",
-    "longDescription": "AgenTeam organizes AI-assisted development into specialist roles (researcher, pm, architect, implementer, test-writer, reviewer) materialized as Codex-native custom agents. Configure pipelines, write policies, and custom roles via agenteam.yaml.",
+    "shortDescription": "AI dev team -- @Researcher, @Pm, @Architect, @Implementer, @Test Writer, @Reviewer.",
+    "longDescription": "ATeam provides 6 specialist roles as Codex agents. Talk to @Architect, @Reviewer, @Pm directly, or use @ATeam to run the full pipeline. Configure roles, write policies, and custom team members via .agenteam/config.yaml.",
     "developerName": "Yiming Wu",
     "category": "Productivity",
     "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
-      "Set up a development team for this project",
+      "Show my team",
       "Run the full pipeline on: add user authentication",
       "Add a security auditor to the team"
     ],

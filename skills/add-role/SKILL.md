@@ -11,8 +11,9 @@ Add a new team member from a natural language description.
 
 ### 1. Auto-Init Guard
 
-Check for `agenteam.yaml` in the project root. If missing:
-- Copy the template: `cp <plugin-dir>/templates/agenteam.yaml.template agenteam.yaml`
+Check for `.agenteam/config.yaml` (or legacy `agenteam.yaml`). If missing:
+- Create config dir: `mkdir -p .agenteam`
+- Copy the template: `cp <plugin-dir>/templates/agenteam.yaml.template .agenteam/config.yaml`
 - Set the team name to the project directory name
 - Generate agents: `python3 <runtime>/agenteam_rt.py generate`
 

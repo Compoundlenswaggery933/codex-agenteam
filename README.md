@@ -9,7 +9,7 @@
 ### 1. Install
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
 ```
 
 Restart Codex, open **Plugins > Local Plugins**, and install AgenTeam.
@@ -229,7 +229,7 @@ AgenTeam enforces write safety so agents don't step on each other:
 ### One-Line Install
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
 ```
 
 ### Local Install (contributors)
@@ -243,7 +243,7 @@ bash install.sh --local
 ### Update
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/update.sh)
+curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/update.sh | bash
 ```
 
 Or from a local clone:

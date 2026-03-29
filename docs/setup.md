@@ -17,7 +17,7 @@ pip install pyyaml toml
 ### One-Line Install
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
 ```
 
 This clones the repo, installs Python dependencies, and registers the plugin in the Codex marketplace.

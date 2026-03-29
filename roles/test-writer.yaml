@@ -10,7 +10,7 @@ responsibilities:
   - Ensure tests are deterministic and fast
 participates_in:
   - test
-model: o3-mini
+model: gpt-5.3-codex
 reasoning_effort: medium
 sandbox_mode: workspace-write
 can_write: true

@@ -39,7 +39,7 @@ Infer as much as possible from the description:
 | `participates_in` | Match to pipeline stages: research, strategy, design, plan, implement, test, review |
 | `can_write` | Yes if the role creates/modifies files; no if it only analyzes |
 | `write_scope` | Infer from what the role writes (docs, src, tests, configs) |
-| `model` | o3 for analysis/review roles, o3-mini for writing/implementation roles |
+| `model` | Omit to inherit the user's default model, or set `gpt-5.3-codex` for coding-heavy roles |
 | `reasoning_effort` | high for analysis roles, medium for writing roles |
 | `system_instructions` | Generate focused instructions from the role's domain |
 
@@ -72,7 +72,7 @@ Here's your new team member:
   Focus: Profiling, bottleneck analysis, optimization
   Stages: review, implement
   Writes to: src/** (optimization patches)
-  Model: o3 (high reasoning)
+  Model: inherited default (or `gpt-5.4` if you want to pin it)
 
   System instructions:
   You are the performance engineer on a AgenTeam. Your primary job is

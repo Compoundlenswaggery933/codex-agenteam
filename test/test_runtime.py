@@ -116,6 +116,8 @@ class TestRoleResolution:
         config_path = tmp_path / "agenteam.yaml"
         with open(config_path) as f:
             config = yaml.safe_load(f)
+        config.setdefault("roles", {})
+        config["roles"].setdefault("architect", {})
         config["roles"]["architect"]["model"] = "o4-mini"
         with open(config_path, "w") as f:
             yaml.dump(config, f)
@@ -193,10 +195,30 @@ class TestTomlGeneration:
         make_config(tmp_path)
         run_rt("generate", cwd=str(tmp_path))
 
-        agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / "architect.toml"))
-        assert agent.get("model") == "o3"
-        assert agent.get("model_reasoning_effort") == "high"
+        agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / "implementer.toml"))
+        assert agent.get("model") == "gpt-5.3-codex"
+        assert agent.get("model_reasoning_effort") == "medium"
         assert agent.get("sandbox_mode") == "workspace-write"
+
+    def test_built_in_roles_generate_codex_supported_models(self, tmp_path):
+        import toml as toml_lib
+
+        make_config(tmp_path)
+        run_rt("generate", cwd=str(tmp_path))
+
+        inherited_roles = {"architect", "pm", "researcher", "reviewer"}
+        pinned_roles = {
+            "implementer": "gpt-5.3-codex",
+            "test_writer": "gpt-5.3-codex",
+        }
+
+        for role_name in inherited_roles:
+            agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / f"{role_name}.toml"))
+            assert "model" not in agent
+
+        for role_name, expected_model in pinned_roles.items():
+            agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / f"{role_name}.toml"))
+            assert agent.get("model") == expected_model
 
     def test_custom_role_generates_toml(self, tmp_path):
         import toml as toml_lib
@@ -210,7 +232,7 @@ class TestTomlGeneration:
                     "description": "Security reviewer",
                     "participates_in": ["review"],
                     "can_write": False,
-                    "model": "o3",
+                    "model": "gpt-5.4",
                     "system_instructions": "You are a security auditor.",
                 }
             },

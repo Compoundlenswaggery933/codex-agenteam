@@ -11,19 +11,9 @@ team:
 # Role overrides (deep-merged with plugin defaults)
 # Uncomment and modify to customize built-in roles
 roles:
-  researcher:
-    model: o3
-    reasoning_effort: high
-
-  pm:
-    model: o3
-    reasoning_effort: high
-
-  architect:
-    model: o3
-    reasoning_effort: high
-
+  # Analysis/review roles inherit the user's default Codex model unless overridden.
   implementer:
+    model: gpt-5.3-codex
     can_write: true
     write_scope:
       - "src/**"
@@ -31,6 +21,7 @@ roles:
       - "docs/plans/**"
 
   test_writer:
+    model: gpt-5.3-codex
     can_write: true
     write_scope:
       - "tests/**"
@@ -51,7 +42,7 @@ roles:
   #     - "Flag hardcoded secrets"
   #   participates_in:
   #     - review
-  #   model: o3
+  #   model: gpt-5.4
   #   reasoning_effort: high
   #   can_write: false
   #   parallel_safe: true

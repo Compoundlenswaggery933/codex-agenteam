@@ -6,17 +6,46 @@
 
 ## Quick Start
 
-### 1. Install
+### 1. Install AgenTeam
+
+Requirements: Python 3.8+ and Codex App or Codex CLI.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
 ```
 
-Restart Codex, open **Plugins > Local Plugins**, and install AgenTeam.
+After the installer finishes:
 
-### 2. Meet Your Team
+- In the **Codex App**, restart Codex, open **Plugins > Local Plugins**, and install AgenTeam.
+- In the **Codex CLI**, restart the session if needed so `$ateam:*` skills are available.
 
-Open any project in Codex and type `@` -- your team appears:
+### 2. Choose Your Entry Point
+
+Use **Codex App** if you want chat-first orchestration with `@` mentions.
+Use **Codex CLI** if you want command-style skill invocation.
+
+#### Codex App (`@ATeam`, `@Role`)
+
+Open any project in Codex and ask AgenTeam to set itself up:
+
+```
+@ATeam show my team
+```
+
+On first run, AgenTeam will create `agenteam.yaml`, generate the role agents,
+and show the available team members.
+
+Use `@ATeam` for setup, status, and pipeline runs.
+Use `@Architect`, `@Implementer`, `@Reviewer`, and other roles for focused work after setup.
+
+Team-level:
+
+```
+@ATeam run the full pipeline on: add user authentication
+@ATeam show team status
+```
+
+Role-level:
 
 ```
 @Architect    -- system design, risk analysis
@@ -27,7 +56,7 @@ Open any project in Codex and type `@` -- your team appears:
 @Test Writer  -- unit and integration tests
 ```
 
-Talk to any role directly:
+Examples:
 
 ```
 @Architect review this API design
@@ -36,15 +65,42 @@ Talk to any role directly:
 @Reviewer check the auth logic in src/auth.py
 ```
 
-Or run the full pipeline through the plugin:
+#### Codex CLI (`$ateam:*`)
+
+From a project root:
 
 ```
-@ATeam run the full pipeline on: add user authentication
+$ateam:init
+$ateam:run "add user authentication"
+$ateam:status
+$ateam:add-role
+$ateam:generate
 ```
 
-That's it. Install, then `@` your team.
+Run `$ateam:init` once per project to create `agenteam.yaml` and `.codex/agents/*.toml`.
+After that, use `$ateam:run` to start work and `$ateam:status` to inspect the current run.
 
-> Want to customize roles, models, or the pipeline? Edit `agenteam.yaml` in your project root, or run `$ateam:init` for guided setup.
+### 3. First 5 Minutes
+
+1. Install plugin and open your project.
+2. Initialize once with `@ATeam show my team` (App) or `$ateam:init` (CLI).
+3. Verify setup:
+   `agenteam.yaml` exists in your project root
+   `.codex/agents/*.toml` exists for the built-in roles
+   `@ATeam show my team` lists the built-in roles in the app
+4. Start with a real task:
+
+```
+@ATeam run the full pipeline on: add rate limiting to the API
+```
+
+```bash
+$ateam:run "add rate limiting to the API"
+```
+
+5. Customize roles, models, and pipeline behavior in `agenteam.yaml` when ready.
+
+> Install, initialize once, then orchestrate with `@ATeam` or `$ateam:*`, and `@` roles directly whenever you want specialist focus.
 
 ## Usage Examples
 
@@ -117,12 +173,12 @@ AgenTeam infers the role config, confirms with you, writes to `agenteam.yaml`, a
 
 | Role | Pipeline Stages | Writes To | Default Model | Purpose |
 |------|----------------|-----------|---------------|---------|
-| **researcher** | research, design | `docs/research/` | o3 | Investigate web, GitHub, docs, community |
-| **pm** | strategy, design | `docs/strategies/` | o3 | Decide what to build, prioritize, write specs |
-| **architect** | design, review | `docs/designs/` | o3 | Design systems, critique plans, identify risks |
-| **implementer** | plan, implement | `docs/plans/`, `src/**`, `lib/**` | o3-mini | Translate designs into plans, then write code |
-| **test_writer** | test | `tests/**`, `*.test.*` | o3-mini | Write unit and integration tests |
-| **reviewer** | review | Read-only | o3 | Review for correctness, security, and regressions |
+| **researcher** | research, design | `docs/research/` | Inherits user default | Investigate web, GitHub, docs, community |
+| **pm** | strategy, design | `docs/strategies/` | Inherits user default | Decide what to build, prioritize, write specs |
+| **architect** | design, review | `docs/designs/` | Inherits user default | Design systems, critique plans, identify risks |
+| **implementer** | plan, implement | `docs/plans/`, `src/**`, `lib/**` | gpt-5.3-codex | Translate designs into plans, then write code |
+| **test_writer** | test | `tests/**`, `*.test.*` | gpt-5.3-codex | Write unit and integration tests |
+| **reviewer** | review | Read-only | Inherits user default | Review for correctness, security, and regressions |
 
 Each role writes to a scoped directory -- no overlaps, safe for parallel execution.
 
@@ -142,11 +198,9 @@ team:
     mode: serial              # serial | scoped (v2) | worktree (v3)
 
 roles:
-  # Override built-in roles
-  architect:
-    model: o3
-    reasoning_effort: high
+  # Analysis/review roles inherit the user's default Codex model
   implementer:
+    model: gpt-5.3-codex
     write_scope:
       - "src/**"
       - "lib/**"
@@ -156,7 +210,7 @@ roles:
   security_auditor:
     description: "Reviews code for security vulnerabilities"
     participates_in: [review]
-    model: o3
+    model: gpt-5.4
     can_write: false
     system_instructions: |
       Focus on OWASP top 10, auth/authz logic, and hardcoded secrets.

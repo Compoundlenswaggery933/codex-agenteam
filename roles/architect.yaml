@@ -12,7 +12,6 @@ participates_in:
   - design
   - plan
   - review
-model: o3
 reasoning_effort: high
 sandbox_mode: workspace-write
 can_write: true

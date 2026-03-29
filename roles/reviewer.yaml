@@ -10,7 +10,6 @@ responsibilities:
   - Flag regressions and unintended side effects
 participates_in:
   - review
-model: o3
 reasoning_effort: high
 sandbox_mode: read-only
 can_write: false

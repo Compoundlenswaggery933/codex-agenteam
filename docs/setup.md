@@ -79,12 +79,9 @@ team:
     mode: serial               # serial | scoped (v2) | worktree (v3)
 
 roles:
-  # Override built-in role settings
-  architect:
-    model: o3
-    reasoning_effort: high
-
+  # Analysis/review roles inherit the user's default Codex model.
   implementer:
+    model: gpt-5.3-codex
     can_write: true
     write_scope:
       - "src/**"

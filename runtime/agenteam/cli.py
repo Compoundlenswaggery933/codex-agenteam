@@ -8,10 +8,11 @@ import yaml
 
 from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
-from .config import find_config, load_config
+from .config import find_config, load_config, load_config_raw
 from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show, cmd_scope_audit
 from .events import cmd_event_append, cmd_event_list
 from .gates import cmd_gate_eval
+from .migrate import cmd_migrate
 from .transitions import cmd_transition
 from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
@@ -42,7 +43,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("generate", help="Generate .codex/agents/*.toml")
 
     # validate
-    sub.add_parser("validate", help="Validate config without creating run state")
+    p_validate = sub.add_parser("validate", help="Validate config without creating run state")
+    p_validate.add_argument("--strict", action="store_true", default=False,
+                            help="Treat warnings as errors (exit 1 on warnings)")
+    p_validate.add_argument("--format", choices=["summary", "diagnostics"], default="summary",
+                            help="Output format: summary (default) or diagnostics (full structured)")
+
+    # migrate
+    p_migrate = sub.add_parser("migrate", help="Migrate legacy config to canonical format")
+    p_migrate.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
+                           help="Show what would change without writing files")
 
     # dispatch
     p_dispatch = sub.add_parser("dispatch", help="Generate dispatch plan for a stage")
@@ -221,6 +231,22 @@ def main() -> None:
             sys.exit(1)
         return
 
+    # migrate handles its own config loading (raw, no validation)
+    if args.command == "migrate":
+        cmd_migrate(args)
+        return
+
+    # validate loads config raw so it can report all errors structurally
+    if args.command == "validate":
+        try:
+            config_path = find_config(args.config if hasattr(args, "config") and args.config else None)
+            config = load_config_raw(config_path)
+        except (FileNotFoundError, ValueError) as e:
+            print(json.dumps({"error": str(e)}), file=sys.stderr)
+            sys.exit(1)
+        cmd_validate(args, config)
+        return
+
     # All other commands need config
     try:
         config_path = find_config(args.config if hasattr(args, "config") and args.config else None)
@@ -239,8 +265,6 @@ def main() -> None:
         cmd_init(args, config)
     elif args.command == "generate":
         cmd_generate(args, config)
-    elif args.command == "validate":
-        cmd_validate(args, config)
     elif args.command == "dispatch":
         cmd_dispatch(args, config)
     elif args.command == "scope-audit":

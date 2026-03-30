@@ -9,8 +9,6 @@ import yaml
 from .constants import (
     ISOLATION_MAP,
     VALID_ISOLATION,
-    VALID_PIPELINES,
-    VALID_WRITE_MODES,
 )
 
 
@@ -100,143 +98,34 @@ def load_config(path: Path) -> dict:
     return config
 
 
+def load_config_raw(path: Path) -> dict:
+    """Load config YAML without validation. Used by migrate command."""
+    with open(path) as f:
+        config = yaml.safe_load(f)
+    if not isinstance(config, dict):
+        raise ValueError("Config must be a YAML mapping")
+    return config
+
+
 def validate_config(config: dict) -> None:
-    """Validate required fields and enum values (new + legacy schema)."""
-    errors = []
+    """Validate required fields and enum values (new + legacy schema).
+
+    Delegates to schema.validate_schema() internally.
+    Raises ValueError on errors, emits warnings to stderr as JSON.
+    Preserves existing external contract.
+    """
+    from .schema import Severity, validate_schema
 
     if not isinstance(config, dict):
         raise ValueError("Config must be a YAML mapping")
 
-    if "version" not in config:
-        errors.append("Missing required field: version")
+    result = validate_schema(config)
 
-    # --- New schema validation (flat keys) ---
-    isolation = config.get("isolation")
-    if isolation and isolation not in VALID_ISOLATION:
-        errors.append(
-            f"Invalid isolation: '{isolation}'. "
-            f"Must be one of: {', '.join(sorted(VALID_ISOLATION))}"
-        )
+    # Emit warnings to stderr as JSON (preserving current behavior)
+    for d in result.warnings:
+        print(json.dumps({"warning": d.message}), file=sys.stderr)
 
-    # Top-level "pipeline" can be a string (mode) or dict (stages).
-    # Only validate if it's a string.
-    pipeline_val = config.get("pipeline")
-    if isinstance(pipeline_val, str) and pipeline_val != "hotl":
-        errors.append(
-            f"Invalid pipeline: '{pipeline_val}'. "
-            "Only 'hotl' is valid as a top-level string. "
-            "Omit for auto-detect, or use pipeline.stages for stage definitions."
-        )
-
-    # --- Legacy schema validation (nested team block) ---
-    team = config.get("team", {})
-    if not isinstance(team, dict):
-        errors.append("'team' must be a mapping")
-    elif team:
-        # Emit deprecation warnings for legacy keys
-        legacy_pipeline = team.get("pipeline")
-        if legacy_pipeline:
-            if legacy_pipeline not in VALID_PIPELINES:
-                errors.append(
-                    f"Invalid team.pipeline: '{legacy_pipeline}'. "
-                    f"Must be one of: {', '.join(sorted(VALID_PIPELINES))}"
-                )
-            else:
-                print(
-                    json.dumps(
-                        {
-                            "warning": (
-                                f"Legacy config key 'team.pipeline: {legacy_pipeline}' found. "
-                                "Consider using top-level 'pipeline: hotl' "
-                                "or omitting for auto-detect."
-                            )
-                        }
-                    ),
-                    file=sys.stderr,
-                )
-
-        pw = team.get("parallel_writes", {})
-        if isinstance(pw, dict) and pw:
-            mode = pw.get("mode")
-            if mode:
-                if mode not in VALID_WRITE_MODES:
-                    errors.append(
-                        f"Invalid team.parallel_writes.mode: '{mode}'. "
-                        f"Must be one of: {', '.join(sorted(VALID_WRITE_MODES))}"
-                    )
-                else:
-                    print(
-                        json.dumps(
-                            {
-                                "warning": (
-                                    f"Legacy config key 'team.parallel_writes.mode: {mode}' found. "
-                                    "Consider using top-level "
-                                    f"'isolation: {ISOLATION_MAP.get(mode, mode)}'."
-                                )
-                            }
-                        ),
-                        file=sys.stderr,
-                    )
-
-    # --- Profile validation ---
-    pipeline_dict = config.get("pipeline", {})
-    if isinstance(pipeline_dict, dict):
-        profiles = pipeline_dict.get("profiles", {})
-        if isinstance(profiles, dict) and profiles:
-            # Collect valid stage names from pipeline.stages
-            pipeline_stages = pipeline_dict.get("stages", [])
-            valid_stage_names = set()
-            stage_rework_map: dict[str, str | None] = {}
-            if isinstance(pipeline_stages, list):
-                for s in pipeline_stages:
-                    if isinstance(s, dict) and "name" in s:
-                        valid_stage_names.add(s["name"])
-                        stage_rework_map[s["name"]] = s.get("rework_to")
-
-            for profile_name, profile_def in profiles.items():
-                if not isinstance(profile_def, dict):
-                    errors.append(f"Profile '{profile_name}' must be a mapping")
-                    continue
-
-                stages_list = profile_def.get("stages")
-                if not stages_list or not isinstance(stages_list, list):
-                    errors.append(f"Profile '{profile_name}': 'stages' must be a non-empty list")
-                    continue
-
-                # Check for unknown stage names
-                profile_stage_set = set()
-                for sname in stages_list:
-                    if not isinstance(sname, str):
-                        errors.append(
-                            f"Profile '{profile_name}': stage names must be strings, got {type(sname).__name__}"
-                        )
-                    elif sname not in valid_stage_names:
-                        errors.append(
-                            f"Profile '{profile_name}': unknown stage '{sname}'"
-                        )
-                    elif sname in profile_stage_set:
-                        errors.append(
-                            f"Profile '{profile_name}': duplicate stage '{sname}'"
-                        )
-                    else:
-                        profile_stage_set.add(sname)
-
-                # Cross-stage rework validation
-                for sname in profile_stage_set:
-                    rework_target = stage_rework_map.get(sname)
-                    if rework_target and rework_target not in profile_stage_set:
-                        errors.append(
-                            f"Profile '{profile_name}': stage '{sname}' has rework_to "
-                            f"'{rework_target}' which is not in this profile"
-                        )
-
-                # Hints type check
-                hints = profile_def.get("hints")
-                if hints is not None:
-                    if not isinstance(hints, list) or not all(isinstance(h, str) for h in hints):
-                        errors.append(
-                            f"Profile '{profile_name}': 'hints' must be a list of strings"
-                        )
-
-    if errors:
-        raise ValueError("; ".join(errors))
+    # Raise on errors (with path-prefixed messages, no codes)
+    if not result.valid:
+        messages = [d.message for d in result.errors]
+        raise ValueError("; ".join(messages))

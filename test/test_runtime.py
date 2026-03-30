@@ -116,6 +116,8 @@ class TestValidateCommand:
             "role_count": 6,
             "stage_count": 7,
             "profile_count": 0,
+            "errors": [],
+            "warnings": [],
         }
         assert not (tmp_path / ".agenteam" / "state").exists()
 
@@ -2506,7 +2508,7 @@ class TestCrossStageRework:
         self._make_rework_config(tmp_path, stages=stages)
         r = run_rt("verify-plan", "test", cwd=str(tmp_path))
         assert r.returncode != 0
-        assert "not found" in r.stderr
+        assert "nonexistent" in r.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -3911,3 +3913,438 @@ class TestResolveStagesForRun:
         assert r.returncode == 0
         result = json.loads(r.stdout)
         assert result["max_retries"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Schema validation (v2.5)
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaValidation:
+    """Tests for the schema.py validation framework via validate --format diagnostics."""
+
+    def _validate(self, tmp_path, config, fmt="diagnostics"):
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        args = ["validate", "--format", fmt]
+        return run_rt(*args, cwd=str(tmp_path))
+
+    def _diag_codes(self, result):
+        data = json.loads(result.stdout)
+        return [d["code"] for d in data.get("diagnostics", [])]
+
+    def test_valid_new_format(self, tmp_path):
+        """Version 2 config with no legacy keys validates cleanly."""
+        config = {
+            "version": "2",
+            "isolation": "branch",
+            "pipeline": {"stages": [
+                {"name": "implement", "roles": ["dev"], "gate": "auto"},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0
+        data = json.loads(r.stdout)
+        assert data["valid"] is True
+        # No errors or warnings
+        assert data["error_count"] == 0
+        assert data["warning_count"] == 0
+
+    def test_missing_version(self, tmp_path):
+        """E001: missing version field."""
+        r = self._validate(tmp_path, {"isolation": "branch"})
+        assert r.returncode != 0
+        assert "E001" in str(json.loads(r.stdout).get("diagnostics", []))
+
+    def test_invalid_isolation(self, tmp_path):
+        """E002: invalid isolation value."""
+        r = self._validate(tmp_path, {"version": "1", "isolation": "invalid"})
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E002" in codes
+
+    def test_invalid_pipeline_string(self, tmp_path):
+        """E003: invalid top-level pipeline string."""
+        r = self._validate(tmp_path, {"version": "1", "pipeline": "invalid"})
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E003" in codes
+
+    def test_duplicate_stage_names(self, tmp_path):
+        """E011: duplicate stage names in pipeline.stages."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": [
+                {"name": "test", "roles": ["qa"], "gate": "auto"},
+                {"name": "test", "roles": ["dev"], "gate": "auto"},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E011" in codes
+
+    def test_rework_to_missing_stage(self, tmp_path):
+        """E008: rework_to references non-existent stage."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": [
+                {"name": "implement", "roles": ["dev"], "gate": "auto",
+                 "rework_to": "nonexistent"},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E008" in codes
+
+    def test_profile_unknown_stage(self, tmp_path):
+        """E009: profile references unknown stage."""
+        config = {
+            "version": "1",
+            "pipeline": {
+                "stages": [{"name": "implement", "roles": ["dev"], "gate": "auto"}],
+                "profiles": {"quick": {"stages": ["nonexistent"]}},
+            },
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E009" in codes
+
+    def test_stage_references_unknown_role(self, tmp_path):
+        """E007: stage references role not in resolved roles."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": [
+                {"name": "implement", "roles": ["nonexistent_role"], "gate": "auto"},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E007" in codes
+
+    def test_legacy_warnings(self, tmp_path):
+        """W001/W002: legacy keys produce warnings."""
+        config = {
+            "version": "1",
+            "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
+            "pipeline": {"stages": []},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0
+        codes = self._diag_codes(r)
+        assert "W001" in codes
+        assert "W002" in codes
+
+    def test_final_verify_string_warning(self, tmp_path):
+        """W004: final_verify as string emits warning."""
+        config = {
+            "version": "1",
+            "final_verify": "python3 -m pytest -v",
+            "pipeline": {"stages": []},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0
+        codes = self._diag_codes(r)
+        assert "W004" in codes
+
+    def test_strict_fails_on_warnings(self, tmp_path):
+        """--strict treats warnings as errors."""
+        config = {
+            "version": "1",
+            "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
+            "pipeline": {"stages": []},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("validate", "--strict", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "strict" in r.stderr.lower()
+
+    def test_invalid_gate_type(self, tmp_path):
+        """E015: invalid gate value."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": [
+                {"name": "test", "roles": ["qa"], "gate": "manual"},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E015" in codes
+
+    def test_invalid_max_retries(self, tmp_path):
+        """E016: max_retries must be non-negative integer."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": [
+                {"name": "test", "roles": ["qa"], "gate": "auto", "max_retries": -1},
+            ]},
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode != 0
+        codes = self._diag_codes(r)
+        assert "E016" in codes
+
+    def test_unknown_top_level_key_suggestion(self, tmp_path):
+        """Unknown key gets 'Did you mean?' suggestion."""
+        config = {
+            "version": "1",
+            "pipline": "hotl",  # typo
+        }
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0  # unknown keys are warnings not errors
+        codes = self._diag_codes(r)
+        assert "W005" in codes
+        # Check suggestion is present
+        diags = json.loads(r.stdout)["diagnostics"]
+        w005 = [d for d in diags if d["code"] == "W005"][0]
+        assert "pipeline" in w005["message"]
+
+    def test_summary_format_backward_compat(self, tmp_path):
+        """Default summary format includes core fields."""
+        config = {"version": "1", "pipeline": {"stages": []}}
+        r = self._validate(tmp_path, config, fmt="summary")
+        assert r.returncode == 0
+        data = json.loads(r.stdout)
+        assert "valid" in data
+        assert "pipeline_mode" in data
+        assert "isolation_mode" in data
+        assert "role_count" in data
+        assert "stage_count" in data
+        assert "profile_count" in data
+        assert "errors" in data
+        assert "warnings" in data
+
+    def test_version_2_accepted(self, tmp_path):
+        """Version 2 config validates cleanly."""
+        config = {"version": "2", "isolation": "branch"}
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0
+        data = json.loads(r.stdout)
+        assert data["valid"] is True
+
+    def test_version_1_new_shape_info(self, tmp_path):
+        """I003: version 1 config with new shape suggests version 2."""
+        config = {"version": "1", "isolation": "branch", "pipeline": {"stages": []}}
+        r = self._validate(tmp_path, config)
+        assert r.returncode == 0
+        diags = json.loads(r.stdout)["diagnostics"]
+        codes = [d["code"] for d in diags]
+        assert "I003" in codes
+        i003 = [d for d in diags if d["code"] == "I003"][0]
+        assert "version" in i003["message"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Migration (v2.5)
+# ---------------------------------------------------------------------------
+
+
+class TestMigration:
+    """Tests for the migrate.py migration engine via migrate CLI command."""
+
+    def _make_legacy_config(self, tmp_path, overrides=None):
+        config = {
+            "version": "1",
+            "team": {
+                "pipeline": "standalone",
+                "parallel_writes": {"mode": "serial"},
+            },
+            "roles": {},
+            "pipeline": {"stages": []},
+        }
+        if overrides:
+            config.update(overrides)
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        return config_path
+
+    def test_migrate_legacy_to_current(self, tmp_path):
+        """Full legacy config migrates to version 2 canonical format."""
+        self._make_legacy_config(tmp_path)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["dry_run"] is False
+        assert len(result["changes"]) > 0
+
+        # Verify migrated file exists and is version 2
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        assert migrated_path.exists()
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert str(migrated["version"]) == "2"
+        assert "team" not in migrated
+        assert migrated.get("isolation") == "branch"
+
+    def test_migrate_dry_run(self, tmp_path):
+        """--dry-run shows changes without writing files."""
+        self._make_legacy_config(tmp_path)
+        r = run_rt("migrate", "--dry-run", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["dry_run"] is True
+        assert len(result["changes"]) > 0
+        # No new file created
+        assert not (tmp_path / ".agenteam" / "config.yaml").exists()
+        # Original still exists
+        assert (tmp_path / "agenteam.yaml").exists()
+
+    def test_migrate_already_current(self, tmp_path):
+        """Version 2 config is a no-op."""
+        config = {"version": "2", "isolation": "branch", "pipeline": {"stages": []}}
+        config_dir = tmp_path / ".agenteam"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["changes"] == []
+        assert "canonical" in result["message"].lower()
+
+    def test_migrate_mixed_format(self, tmp_path):
+        """Config with both legacy and new keys: legacy removed, new preserved."""
+        config = {
+            "version": "1",
+            "isolation": "worktree",
+            "team": {"parallel_writes": {"mode": "serial"}},
+            "pipeline": {"stages": []},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert migrated["isolation"] == "worktree"  # new key preserved
+        assert "team" not in migrated
+
+    def test_migrate_file_relocation(self, tmp_path):
+        """agenteam.yaml is relocated to .agenteam/config.yaml, old renamed to .bak."""
+        self._make_legacy_config(tmp_path)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+        # Old file renamed to .bak
+        assert not (tmp_path / "agenteam.yaml").exists()
+        bak_files = list(tmp_path.glob("agenteam.yaml.bak-*"))
+        assert len(bak_files) == 1
+
+        # New file at correct location
+        assert (tmp_path / ".agenteam" / "config.yaml").exists()
+
+    def test_migrate_in_place(self, tmp_path):
+        """.agenteam/config.yaml with legacy keys updates in place with backup."""
+        config = {
+            "version": "1",
+            "team": {"pipeline": "hotl", "parallel_writes": {"mode": "worktree"}},
+            "pipeline": {"stages": []},
+        }
+        config_dir = tmp_path / ".agenteam"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+        # Backup created
+        bak_files = list(config_dir.glob("config.yaml.bak-*"))
+        assert len(bak_files) == 1
+
+        # Migrated in place
+        with open(config_path) as f:
+            migrated = yaml.safe_load(f)
+        assert str(migrated["version"]) == "2"
+        assert migrated.get("pipeline") == "hotl"
+        assert migrated.get("isolation") == "worktree"
+
+    def test_migrate_hotl_pipeline(self, tmp_path):
+        """team.pipeline: hotl -> pipeline: hotl."""
+        self._make_legacy_config(tmp_path, overrides={
+            "team": {"pipeline": "hotl", "parallel_writes": {"mode": "serial"}},
+        })
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert migrated.get("pipeline") == "hotl"
+
+    def test_migrate_serial_to_branch(self, tmp_path):
+        """team.parallel_writes.mode: serial -> isolation: branch."""
+        self._make_legacy_config(tmp_path)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert migrated.get("isolation") == "branch"
+
+    def test_migrate_worktree_isolation(self, tmp_path):
+        """team.parallel_writes.mode: worktree -> isolation: worktree."""
+        self._make_legacy_config(tmp_path, overrides={
+            "team": {"pipeline": "standalone", "parallel_writes": {"mode": "worktree"}},
+        })
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert migrated.get("isolation") == "worktree"
+
+    def test_migrate_idempotent(self, tmp_path):
+        """Running migrate on version 2 config is a no-op."""
+        config = {"version": "2", "isolation": "branch"}
+        config_dir = tmp_path / ".agenteam"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["changes"] == []
+
+    def test_migrate_final_verify_string_to_list(self, tmp_path):
+        """final_verify string is normalized to list."""
+        config = {
+            "version": "1",
+            "final_verify": "python3 -m pytest -v",
+            "pipeline": {"stages": []},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        migrated_path = tmp_path / ".agenteam" / "config.yaml"
+        with open(migrated_path) as f:
+            migrated = yaml.safe_load(f)
+        assert isinstance(migrated["final_verify"], list)
+        assert migrated["final_verify"] == ["python3 -m pytest -v"]
+
+    def test_migrate_backup_timestamped(self, tmp_path):
+        """Backup filename contains timestamp pattern."""
+        self._make_legacy_config(tmp_path)
+        r = run_rt("migrate", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        backup = result["backup"]
+        assert ".bak-" in backup
+        # Pattern: .bak-YYYYMMDDTHHMMSSZ
+        import re
+        assert re.search(r"\.bak-\d{8}T\d{6}Z", backup)

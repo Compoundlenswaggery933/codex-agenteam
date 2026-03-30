@@ -1,9 +1,11 @@
 """Config validation summary with no side effects."""
 
 import json
+import sys
 
 from .config import resolve_team_config
 from .roles import resolve_roles
+from .schema import validate_schema
 from .state import get_pipeline_stages
 
 
@@ -26,12 +28,40 @@ def cmd_validate(args, config: dict) -> None:
     pipeline_dict = config.get("pipeline", {})
     profiles = pipeline_dict.get("profiles", {}) if isinstance(pipeline_dict, dict) else {}
 
-    result = {
-        "valid": True,
-        "pipeline_mode": summary_pipeline_mode,
-        "isolation_mode": isolation_mode,
-        "role_count": len(roles),
-        "stage_count": len(stages),
-        "profile_count": len(profiles),
-    }
-    print(json.dumps(result))
+    # Run structured validation with cross-reference checks
+    schema_result = validate_schema(config, resolved_roles=roles)
+
+    output_format = getattr(args, "format", "summary") or "summary"
+    strict = getattr(args, "strict", False)
+
+    if output_format == "diagnostics":
+        result = schema_result.to_dict()
+        result["pipeline_mode"] = summary_pipeline_mode
+        result["isolation_mode"] = isolation_mode
+        result["role_count"] = len(roles)
+        result["stage_count"] = len(stages)
+        result["profile_count"] = len(profiles)
+        print(json.dumps(result))
+    else:
+        # Backward-compatible summary format
+        result = {
+            "valid": schema_result.valid,
+            "pipeline_mode": summary_pipeline_mode,
+            "isolation_mode": isolation_mode,
+            "role_count": len(roles),
+            "stage_count": len(stages),
+            "profile_count": len(profiles),
+            "errors": [d.message for d in schema_result.errors],
+            "warnings": [d.message for d in schema_result.warnings],
+        }
+        print(json.dumps(result))
+
+    if not schema_result.valid:
+        sys.exit(1)
+
+    if strict and schema_result.warnings:
+        print(
+            json.dumps({"error": f"--strict: {len(schema_result.warnings)} warning(s) found"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)

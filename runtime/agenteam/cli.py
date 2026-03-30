@@ -9,18 +9,24 @@ import yaml
 from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
 from .config import find_config, load_config, load_config_raw
-from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show, cmd_scope_audit
+from .dispatch import (
+    cmd_dispatch,
+    cmd_policy_check,
+    cmd_roles_list,
+    cmd_roles_show,
+    cmd_scope_audit,
+)
 from .events import cmd_event_append, cmd_event_list
 from .gates import cmd_gate_eval
-from .migrate import cmd_migrate
-from .transitions import cmd_transition
 from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
 from .hotl_adapter import cmd_hotl_skills
+from .migrate import cmd_migrate
 from .report import cmd_run_report
 from .resume import cmd_resume_detect, cmd_resume_plan
 from .standup import cmd_standup
-from .state import cmd_init, cmd_stage_baseline, cmd_status
+from .state import cmd_init, cmd_stage_baseline, cmd_status, validate_run_id
+from .transitions import cmd_transition
 from .validate import cmd_validate
 from .verify import cmd_final_verify_plan, cmd_record_gate, cmd_record_verify, cmd_verify_plan
 
@@ -46,8 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate = sub.add_parser("validate", help="Validate config without creating run state")
     p_validate.add_argument("--strict", action="store_true", default=False,
                             help="Treat warnings as errors (exit 1 on warnings)")
-    p_validate.add_argument("--format", choices=["summary", "diagnostics"], default="summary",
-                            help="Output format: summary (default) or diagnostics (full structured)")
+    p_validate.add_argument(
+        "--format", choices=["summary", "diagnostics"], default="summary",
+        help="Output format: summary or diagnostics (full structured)",
+    )
 
     # migrate
     p_migrate = sub.add_parser("migrate", help="Migrate legacy config to canonical format")
@@ -239,7 +247,8 @@ def main() -> None:
     # validate loads config raw so it can report all errors structurally
     if args.command == "validate":
         try:
-            config_path = find_config(args.config if hasattr(args, "config") and args.config else None)
+            cfg_arg = args.config if hasattr(args, "config") and args.config else None
+            config_path = find_config(cfg_arg)
             config = load_config_raw(config_path)
         except (FileNotFoundError, ValueError) as e:
             print(json.dumps({"error": str(e)}), file=sys.stderr)
@@ -249,11 +258,21 @@ def main() -> None:
 
     # All other commands need config
     try:
-        config_path = find_config(args.config if hasattr(args, "config") and args.config else None)
+        cfg_arg = args.config if hasattr(args, "config") and args.config else None
+        config_path = find_config(cfg_arg)
         config = load_config(config_path)
     except (FileNotFoundError, ValueError) as e:
         print(json.dumps({"error": str(e)}), file=sys.stderr)
         sys.exit(1)
+
+    # Validate run_id if present (prevent path traversal)
+    run_id = getattr(args, "run_id", None)
+    if run_id:
+        try:
+            validate_run_id(run_id)
+        except ValueError as e:
+            print(json.dumps({"error": str(e)}), file=sys.stderr)
+            sys.exit(1)
 
     if args.command == "branch-plan":
         cmd_branch_plan(args, config)

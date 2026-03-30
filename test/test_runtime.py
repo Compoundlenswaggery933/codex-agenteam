@@ -325,6 +325,32 @@ class TestInitAndState:
         r = run_rt("status", cwd=str(tmp_path))
         assert r.returncode != 0
 
+    def test_path_traversal_run_id_rejected(self, tmp_path):
+        """Run IDs with path traversal characters are rejected."""
+        make_config(tmp_path)
+        r = run_rt(
+            "dispatch", "implement",
+            "--run-id", "../../etc/passwd",
+            "--task", "test",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "Invalid run_id" in r.stderr
+
+    def test_valid_run_id_accepted(self, tmp_path):
+        """Normal run IDs with alphanumeric, hyphens, underscores pass."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        run_id = json.loads(r.stdout)["run_id"]
+        r = run_rt(
+            "dispatch", "implement",
+            "--run-id", run_id,
+            "--task", "test",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+
 
 # ---------------------------------------------------------------------------
 # Dispatch

@@ -1,8 +1,6 @@
 """Schema validation framework for AgenTeam config files."""
 
 import difflib
-import json
-import sys
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -127,7 +125,8 @@ def _pass_top_level_enums(config: dict, result: ValidationResult) -> None:
     if isolation and isolation not in VALID_ISOLATION:
         result.diagnostics.append(Diagnostic(
             Severity.ERROR, "isolation",
-            f"Invalid isolation: '{isolation}'. Must be one of: {', '.join(sorted(VALID_ISOLATION))}",
+            f"Invalid isolation: '{isolation}'. "
+            f"Must be one of: {', '.join(sorted(VALID_ISOLATION))}",
             "E002",
         ))
 
@@ -144,7 +143,8 @@ def _pass_top_level_enums(config: dict, result: ValidationResult) -> None:
     if fvp is not None and fvp not in VALID_FINAL_VERIFY_POLICIES:
         result.diagnostics.append(Diagnostic(
             Severity.ERROR, "final_verify_policy",
-            f"Invalid final_verify_policy: '{fvp}'. Must be one of: {', '.join(sorted(VALID_FINAL_VERIFY_POLICIES))}",
+            f"Invalid final_verify_policy: '{fvp}'. "
+            f"Must be one of: {', '.join(sorted(VALID_FINAL_VERIFY_POLICIES))}",
             "E013",
         ))
 
@@ -204,8 +204,6 @@ def _pass_legacy_keys(config: dict, result: ValidationResult) -> None:
                     "E019",
                 ))
             else:
-                from .constants import ISOLATION_MAP
-                mapped = ISOLATION_MAP.get(mode, mode)
                 result.diagnostics.append(Diagnostic(
                     Severity.WARNING, "team.parallel_writes.mode",
                     f"Legacy config format detected at team.parallel_writes.mode: '{mode}'. "
@@ -435,7 +433,8 @@ def _pass_profiles(config: dict, result: ValidationResult) -> None:
             if not isinstance(sname, str):
                 result.diagnostics.append(Diagnostic(
                     Severity.ERROR, f"{prefix}.stages[{j}]",
-                    f"{prefix}.stages[{j}]: stage names must be strings, got {type(sname).__name__}",
+                    f"{prefix}.stages[{j}]: stage names must be strings, "
+                    f"got {type(sname).__name__}",
                     "E009",
                 ))
             elif sname not in valid_stage_names:

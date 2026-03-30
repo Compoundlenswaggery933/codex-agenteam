@@ -6,10 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from .constants import (
-    ISOLATION_MAP,
-    VALID_ISOLATION,
-)
+from .constants import ISOLATION_MAP
 
 
 def resolve_team_config(config: dict) -> tuple[str | None, str]:
@@ -114,7 +111,7 @@ def validate_config(config: dict) -> None:
     Raises ValueError on errors, emits warnings to stderr as JSON.
     Preserves existing external contract.
     """
-    from .schema import Severity, validate_schema
+    from .schema import validate_schema
 
     if not isinstance(config, dict):
         raise ValueError("Config must be a YAML mapping")

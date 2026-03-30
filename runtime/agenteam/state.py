@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -9,6 +10,22 @@ from pathlib import Path
 
 from .config import find_config, resolve_team_config
 from .events import append_event
+
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+
+def validate_run_id(run_id: str) -> None:
+    """Validate run_id to prevent path traversal.
+
+    Raises ValueError if run_id contains path separators or other
+    dangerous characters.
+    """
+    if not _RUN_ID_RE.match(run_id):
+        raise ValueError(
+            f"Invalid run_id '{run_id}'. "
+            "Must contain only alphanumeric characters, hyphens, "
+            "and underscores."
+        )
 
 
 def generate_run_id() -> str:
@@ -276,7 +293,8 @@ def cmd_stage_baseline(args, config: dict) -> None:
                 "baseline": baseline,
                 "action": "rollback",
                 "allowed": False,
-                "reason": "Rollback disabled in isolation:none -- would affect user's branch directly",
+                "reason": "Rollback disabled in isolation:none -- "
+                "would affect user's branch directly",
             }))
         else:
             print(json.dumps({

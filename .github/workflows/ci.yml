@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r runtime/requirements.txt
+          pip install ruff pytest pip-audit
+
+      - name: Ruff lint (includes security rules)
+        run: ruff check runtime/ test/
+
+      - name: Ruff format check
+        run: ruff format --check runtime/ test/
+
+      - name: Run tests
+        run: python3 -m pytest test/test_runtime.py -v
+
+      - name: Dependency audit
+        run: pip-audit -r runtime/requirements.txt

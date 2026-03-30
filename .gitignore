@@ -1,8 +1,32 @@
-test/__pycache__/
+# Python
+__pycache__/
+
+# AgenTeam runtime artifacts
 .agenteam/
 .ateam-worktrees/
 agenteam.yaml
+
+# HOTL runtime artifacts
+hotl-workflow*.md
 .hotl/
+
+# Generated docs (per-session, not repo content)
+docs/plans/
+docs/designs/
+docs/strategies/
+docs/research/
+docs/meetings/
+CLAUDE.md
+
+# Lore runtime data
+.lore/
+
+# Codex local config
+.codex/
+.agents/
+
+# Claude Code local config
+.claude/
 
 # OS
 *.DS_Store
@@ -11,28 +35,6 @@ Thumbs.db
 # Environment
 .env
 .env.*
-
-# HOTL runtime artifacts
-hotl-workflow*.md
-.hotl/
-
-# Generated docs and Claude config (per-session, not repo content)
-docs/plans/
-docs/designs/
-docs/strategies/
-docs/research/
-docs/meetings/
-CLAUDE.md
-
-# Lore runtime data (user-specific, not repo content)
-.lore/
-
-# Codex local config (user-specific hooks, settings)
-.codex/
-.agents/
-
-# Claude Code local config
-.claude/
 
 # IDE
 .idea/
@@ -47,10 +49,9 @@ CLAUDE.md
 # Logs
 *.log
 
-# TypeScript build output (if ever added)
+# Build
 dist/
 *.tsbuildinfo
 
-# Temp files from atomic writes
+# Temp
 *.tmp
-runtime/agenteam/__pycache__/

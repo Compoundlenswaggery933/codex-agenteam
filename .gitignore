@@ -17,6 +17,8 @@ hotl-workflow*.md
 
 # Design docs and Claude config (generated per-session, not repo content)
 docs/plans/
+docs/designs/
+docs/strategies/
 CLAUDE.md
 
 # Lore runtime data (user-specific, not repo content)

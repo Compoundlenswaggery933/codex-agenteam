@@ -115,6 +115,7 @@ class TestValidateCommand:
             "isolation_mode": "branch",
             "role_count": 6,
             "stage_count": 7,
+            "profile_count": 0,
         }
         assert not (tmp_path / ".agenteam" / "state").exists()
 
@@ -3664,3 +3665,241 @@ class TestHotlAdapter:
         result = json.loads(r.stdout)
         assert result["configured_skills"] == []
         assert result["eligible"] == []
+
+
+# ---------------------------------------------------------------------------
+# Profile validation
+# ---------------------------------------------------------------------------
+
+
+class TestProfileValidation:
+    def _make_config_with_profiles(self, tmp_path, profiles, extra_stages=None):
+        """Helper: create config with pipeline.profiles."""
+        import yaml
+        with open(TEMPLATE) as f:
+            config = yaml.safe_load(f)
+        if "pipeline" not in config or not isinstance(config["pipeline"], dict):
+            config["pipeline"] = {"stages": []}
+        config["pipeline"]["profiles"] = profiles
+        if extra_stages:
+            config["pipeline"]["stages"].extend(extra_stages)
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        return config_path
+
+    def test_valid_profiles_accepted(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_unknown_stage_in_profile_rejected(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "bad": {"stages": ["nonexistent"]},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "unknown stage" in r.stderr
+
+    def test_duplicate_stage_in_profile_rejected(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "bad": {"stages": ["implement", "implement"]},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "duplicate stage" in r.stderr
+
+    def test_empty_stages_in_profile_rejected(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "bad": {"stages": []},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "non-empty list" in r.stderr
+
+    def test_hints_must_be_list_of_strings(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "bad": {"stages": ["implement"], "hints": 42},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "hints" in r.stderr
+
+    def test_rework_to_outside_profile_rejected(self, tmp_path):
+        # test stage has rework_to: implement, so a profile with test but not implement should fail
+        self._make_config_with_profiles(tmp_path, {
+            "bad": {"stages": ["test"]},
+        })
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "rework_to" in r.stderr
+
+    def test_no_profiles_key_is_valid(self, tmp_path):
+        make_config(tmp_path)
+        r = run_rt("roles", "list", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Profile init
+# ---------------------------------------------------------------------------
+
+
+class TestProfileInit:
+    def _make_config_with_profiles(self, tmp_path, profiles):
+        import yaml
+        with open(TEMPLATE) as f:
+            config = yaml.safe_load(f)
+        if "pipeline" not in config or not isinstance(config["pipeline"], dict):
+            config["pipeline"] = {"stages": []}
+        config["pipeline"]["profiles"] = profiles
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        return config_path
+
+    def test_init_with_profile_snapshots_subset(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert state["profile"] == "quick"
+        assert state["stage_order"] == ["implement", "test"]
+        assert set(state["stages"].keys()) == {"implement", "test"}
+
+    def test_init_without_profile_uses_all_stages(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert state["profile"] is None
+        assert len(state["stage_order"]) == 7
+        assert len(state["stages"]) == 7
+
+    def test_init_unknown_profile_fails(self, tmp_path):
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "test", "--profile", "nonexistent", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "Unknown profile" in r.stderr
+
+    def test_init_full_profile_implicit(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "full", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert len(state["stage_order"]) == 7
+
+    def test_init_snapshots_full_stage_config(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        impl = state["stages"]["implement"]
+        assert "verify" in impl
+        assert "max_retries" in impl
+        assert "rework_to" in impl
+        assert "criteria" in impl
+        assert impl["max_retries"] == 2  # from template
+
+    def test_init_preserves_pipeline_order(self, tmp_path):
+        # Profile lists stages out of pipeline order
+        self._make_config_with_profiles(tmp_path, {
+            "reversed": {"stages": ["test", "implement"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "reversed", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        # Pipeline order: implement comes before test
+        assert state["stage_order"] == ["implement", "test"]
+
+    def test_init_profile_stores_stage_order(self, tmp_path):
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert isinstance(state["stage_order"], list)
+        assert state["stage_order"] == list(state["stages"].keys())
+
+
+# ---------------------------------------------------------------------------
+# resolve_stages_for_run (tested indirectly via dispatch)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveStagesForRun:
+    def _make_config_with_profiles(self, tmp_path, profiles):
+        import yaml
+        with open(TEMPLATE) as f:
+            config = yaml.safe_load(f)
+        if "pipeline" not in config or not isinstance(config["pipeline"], dict):
+            config["pipeline"] = {"stages": []}
+        config["pipeline"]["profiles"] = profiles
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        return config_path
+
+    def test_with_run_id_returns_state_stages(self, tmp_path):
+        """Init with quick profile, then dispatch should only see implement/test."""
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        run_id = json.loads(r.stdout)["run_id"]
+
+        # dispatch against a stage in the profile should work
+        r = run_rt("dispatch", "implement", "--run-id", run_id, "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+        # dispatch against a stage NOT in the profile should fail
+        r = run_rt("dispatch", "research", "--run-id", run_id, "--task", "test", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+    def test_without_run_id_returns_config_stages(self, tmp_path):
+        """Dispatch without run-id should use all config stages."""
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        # dispatch without --run-id should still find research (from config)
+        r = run_rt("dispatch", "research", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_state_stages_immune_to_config_change(self, tmp_path):
+        """After init, changing config should not affect run-scoped commands."""
+        import yaml
+        self._make_config_with_profiles(tmp_path, {
+            "quick": {"stages": ["implement", "test"]},
+        })
+        r = run_rt("init", "--task", "test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        run_id = json.loads(r.stdout)["run_id"]
+
+        # Read and modify config: change max_retries on implement
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        for s in config["pipeline"]["stages"]:
+            if s["name"] == "implement":
+                s["max_retries"] = 99
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        # verify-plan should use original max_retries from state (2), not config (99)
+        r = run_rt("verify-plan", "implement", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["max_retries"] == 2

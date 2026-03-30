@@ -178,5 +178,65 @@ def validate_config(config: dict) -> None:
                         file=sys.stderr,
                     )
 
+    # --- Profile validation ---
+    pipeline_dict = config.get("pipeline", {})
+    if isinstance(pipeline_dict, dict):
+        profiles = pipeline_dict.get("profiles", {})
+        if isinstance(profiles, dict) and profiles:
+            # Collect valid stage names from pipeline.stages
+            pipeline_stages = pipeline_dict.get("stages", [])
+            valid_stage_names = set()
+            stage_rework_map: dict[str, str | None] = {}
+            if isinstance(pipeline_stages, list):
+                for s in pipeline_stages:
+                    if isinstance(s, dict) and "name" in s:
+                        valid_stage_names.add(s["name"])
+                        stage_rework_map[s["name"]] = s.get("rework_to")
+
+            for profile_name, profile_def in profiles.items():
+                if not isinstance(profile_def, dict):
+                    errors.append(f"Profile '{profile_name}' must be a mapping")
+                    continue
+
+                stages_list = profile_def.get("stages")
+                if not stages_list or not isinstance(stages_list, list):
+                    errors.append(f"Profile '{profile_name}': 'stages' must be a non-empty list")
+                    continue
+
+                # Check for unknown stage names
+                profile_stage_set = set()
+                for sname in stages_list:
+                    if not isinstance(sname, str):
+                        errors.append(
+                            f"Profile '{profile_name}': stage names must be strings, got {type(sname).__name__}"
+                        )
+                    elif sname not in valid_stage_names:
+                        errors.append(
+                            f"Profile '{profile_name}': unknown stage '{sname}'"
+                        )
+                    elif sname in profile_stage_set:
+                        errors.append(
+                            f"Profile '{profile_name}': duplicate stage '{sname}'"
+                        )
+                    else:
+                        profile_stage_set.add(sname)
+
+                # Cross-stage rework validation
+                for sname in profile_stage_set:
+                    rework_target = stage_rework_map.get(sname)
+                    if rework_target and rework_target not in profile_stage_set:
+                        errors.append(
+                            f"Profile '{profile_name}': stage '{sname}' has rework_to "
+                            f"'{rework_target}' which is not in this profile"
+                        )
+
+                # Hints type check
+                hints = profile_def.get("hints")
+                if hints is not None:
+                    if not isinstance(hints, list) or not all(isinstance(h, str) for h in hints):
+                        errors.append(
+                            f"Profile '{profile_name}': 'hints' must be a list of strings"
+                        )
+
     if errors:
         raise ValueError("; ".join(errors))

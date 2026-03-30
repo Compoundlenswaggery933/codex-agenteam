@@ -23,11 +23,15 @@ def cmd_validate(args, config: dict) -> None:
     else:
         summary_pipeline_mode = pipeline_mode or "standalone"
 
+    pipeline_dict = config.get("pipeline", {})
+    profiles = pipeline_dict.get("profiles", {}) if isinstance(pipeline_dict, dict) else {}
+
     result = {
         "valid": True,
         "pipeline_mode": summary_pipeline_mode,
         "isolation_mode": isolation_mode,
         "role_count": len(roles),
         "stage_count": len(stages),
+        "profile_count": len(profiles),
     }
     print(json.dumps(result))

@@ -78,3 +78,22 @@ pipeline:
     - name: review
       roles: [reviewer]
       gate: human
+
+  # --- Pipeline profiles (optional) ---
+  # Named subsets of stages for different task sizes.
+  # Omit for full pipeline on every run.
+  # profiles:
+  #   quick:
+  #     stages: [implement, test]
+  #     hints:
+  #       - typo
+  #       - one-line fix
+  #       - config change
+  #       - version bump
+  #   standard:
+  #     stages: [design, plan, implement, test, review]
+  #     hints:
+  #       - new endpoint
+  #       - refactor
+  #       - add feature
+  #       - fix bug

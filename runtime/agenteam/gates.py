@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .state import get_pipeline_stages
+from .state import get_pipeline_stages, resolve_stages_for_run
 
 
 def cmd_gate_eval(args, config: dict) -> None:
@@ -18,8 +18,8 @@ def cmd_gate_eval(args, config: dict) -> None:
     run_id = args.run_id
     stage_name = args.stage
 
-    # Find stage config
-    stages = get_pipeline_stages(config)
+    # Find stage config (prefer state when run-scoped)
+    stages = resolve_stages_for_run(run_id, config)
     stage_config = None
     for s in stages:
         if s["name"] == stage_name:

@@ -10,10 +10,12 @@ from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
 from .config import find_config, load_config
 from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show, cmd_scope_audit
+from .gates import cmd_gate_eval
 from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
+from .report import cmd_run_report
 from .standup import cmd_standup
-from .state import cmd_init, cmd_status
+from .state import cmd_init, cmd_stage_baseline, cmd_status
 from .validate import cmd_validate
 from .verify import cmd_final_verify_plan, cmd_record_gate, cmd_record_verify, cmd_verify_plan
 
@@ -117,6 +119,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_record_gate.add_argument("--gate-type", dest="gate_type", required=True)
     p_record_gate.add_argument("--result", required=True, choices=["approved", "rejected"])
     p_record_gate.add_argument("--verdict", default="")
+    p_record_gate.add_argument("--criteria-failed", dest="criteria_failed", default="")
+    p_record_gate.add_argument("--criteria-details", dest="criteria_details", default="")
+    p_record_gate.add_argument("--override-reason", dest="override_reason", default="")
+
+    # record-verify: add --rework-stage
+    p_record_verify.add_argument("--rework-stage", dest="rework_stage", default=None)
+
+    # stage-baseline
+    p_stage_baseline = sub.add_parser("stage-baseline", help="Capture or rollback a stage baseline")
+    p_stage_baseline.add_argument("--run-id", dest="run_id", required=True)
+    p_stage_baseline.add_argument("--stage", required=True)
+    p_stage_baseline.add_argument("--action", required=True, choices=["capture", "rollback"])
+
+    # run-report
+    p_run_report = sub.add_parser("run-report", help="Assemble run report from state")
+    p_run_report.add_argument("--run-id", dest="run_id", required=True)
+
+    # gate-eval
+    p_gate_eval = sub.add_parser("gate-eval", help="Evaluate gate criteria for a stage")
+    p_gate_eval.add_argument("--run-id", dest="run_id", required=True)
+    p_gate_eval.add_argument("--stage", required=True)
 
     return parser
 
@@ -194,6 +217,12 @@ def main() -> None:
         cmd_final_verify_plan(args, config)
     elif args.command == "record-gate":
         cmd_record_gate(args, config)
+    elif args.command == "stage-baseline":
+        cmd_stage_baseline(args, config)
+    elif args.command == "run-report":
+        cmd_run_report(args, config)
+    elif args.command == "gate-eval":
+        cmd_gate_eval(args, config)
     else:
         parser.print_help()
         sys.exit(1)

@@ -1,6 +1,7 @@
 """Run state management: init, status, state file I/O."""
 
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,33 @@ def get_pipeline_stages(config: dict) -> list[dict]:
     pipeline = config.get("pipeline", {})
     stages: list[dict] = pipeline.get("stages", [])
     return stages
+
+
+def set_stage_field(run_id: str, stage: str, field: str, value) -> None:
+    """Set an arbitrary field on a stage in state.
+
+    Loads the state file, sets state["stages"][stage][field] = value,
+    and writes it back. Exits with error if run or stage not found.
+    """
+    state_path = Path.cwd() / ".agenteam" / "state" / f"{run_id}.json"
+    if not state_path.exists():
+        print(
+            json.dumps({"error": f"Run {run_id} not found"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    with open(state_path) as f:
+        state = json.load(f)
+    stages = state.get("stages", {})
+    if stage not in stages:
+        print(
+            json.dumps({"error": f"Stage '{stage}' not found in state"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    stages[stage][field] = value
+    with open(state_path, "w") as f:
+        json.dump(state, f, indent=2)
 
 
 def cmd_init(args, config: dict) -> None:
@@ -39,6 +67,9 @@ def cmd_init(args, config: dict) -> None:
         "task": task,
         "pipeline_mode": pipeline_mode,
         "current_stage": stages[0]["name"] if stages else None,
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "status": "running",
+        "branch": None,
         "stages": {},
         "write_locks": {
             "active": None,
@@ -80,6 +111,98 @@ def find_latest_state_path() -> Path | None:
     if not files:
         return None
     return files[0]
+
+
+def cmd_stage_baseline(args, config: dict) -> None:
+    """Capture or retrieve a per-stage git baseline.
+
+    Arguments: --run-id <id> --stage <stage> --action capture|rollback
+    """
+    run_id = args.run_id
+    stage_name = args.stage
+    action = args.action
+
+    state_path = Path.cwd() / ".agenteam" / "state" / f"{run_id}.json"
+    if not state_path.exists():
+        print(
+            json.dumps({"error": f"Run {run_id} not found"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    with open(state_path) as f:
+        state = json.load(f)
+
+    stages = state.get("stages", {})
+    if stage_name not in stages:
+        print(
+            json.dumps({"error": f"Stage '{stage_name}' not found in state"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    stage_state = stages[stage_name]
+
+    if action == "capture":
+        # Record current HEAD as baseline
+        try:
+            proc = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            sha = proc.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            print(
+                json.dumps({"error": f"git rev-parse HEAD failed: {e.stderr.strip()}"}),
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        stage_state["baseline"] = sha
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        print(json.dumps({
+            "stage": stage_name,
+            "baseline": sha,
+            "action": "capture",
+        }))
+
+    elif action == "rollback":
+        baseline = stage_state.get("baseline")
+        if not baseline:
+            print(
+                json.dumps({"error": f"No baseline found for stage '{stage_name}'"}),
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Check isolation mode for safety
+        _, isolation_mode = resolve_team_config(config)
+
+        if isolation_mode == "none":
+            print(json.dumps({
+                "stage": stage_name,
+                "baseline": baseline,
+                "action": "rollback",
+                "allowed": False,
+                "reason": "Rollback disabled in isolation:none -- would affect user's branch directly",
+            }))
+        else:
+            print(json.dumps({
+                "stage": stage_name,
+                "baseline": baseline,
+                "action": "rollback",
+                "allowed": True,
+            }))
+
+    else:
+        print(
+            json.dumps({"error": f"Unknown action '{action}'. Must be 'capture' or 'rollback'"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def cmd_status(args, config: dict) -> None:

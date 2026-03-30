@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import resolve_team_config
+from .roles import resolve_roles
 from .state import get_pipeline_stages
 
 
@@ -180,18 +181,51 @@ def cmd_verify_plan(args, config: dict) -> None:
     if verify:
         result["cwd"] = _resolve_cwd(config, run_id)
 
+    # Cross-stage rework: if rework_to is configured, resolve the target stage's writing roles
+    rework_to = stage_config.get("rework_to")
+    if rework_to:
+        # Find target stage config
+        target_stage_config = None
+        for s in stages:
+            if s["name"] == rework_to:
+                target_stage_config = s
+                break
+
+        if not target_stage_config:
+            print(
+                json.dumps({"error": f"rework_to stage '{rework_to}' not found in pipeline"}),
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Resolve writing roles from the target stage
+        roles = resolve_roles(config)
+        target_role_names = target_stage_config.get("roles", [])
+        rework_roles = []
+        for rname in target_role_names:
+            role = roles.get(rname, {"name": rname})
+            if role.get("can_write", False):
+                rework_roles.append(rname)
+        # If no writing roles, include all roles from the target stage
+        if not rework_roles:
+            rework_roles = list(target_role_names)
+
+        result["rework_to"] = rework_to
+        result["rework_roles"] = rework_roles
+
     print(json.dumps(result))
 
 
 def cmd_record_verify(args, config: dict) -> None:
     """Record a verification result for a stage.
 
-    Arguments: --run-id <id> --stage <stage> --result pass|fail [--output "..."]
+    Arguments: --run-id <id> --stage <stage> --result pass|fail [--output "..."] [--rework-stage <stage>]
     """
     run_id = args.run_id
     stage_name = args.stage
     result_val = args.result
     output = getattr(args, "output", None) or ""
+    rework_stage = getattr(args, "rework_stage", None)
 
     state = _load_state(run_id)
 
@@ -216,6 +250,8 @@ def cmd_record_verify(args, config: dict) -> None:
     }
     if output:
         entry["output"] = output
+    if rework_stage:
+        entry["rework_stage"] = rework_stage
 
     stage_state["verify_attempts"].append(entry)
     stage_state["verify_result"] = result_val
@@ -272,13 +308,18 @@ def cmd_final_verify_plan(args, config: dict) -> None:
 def cmd_record_gate(args, config: dict) -> None:
     """Record a gate decision for a stage.
 
-    Arguments: --run-id <id> --stage <stage> --gate-type <type> --result <approved|rejected> [--verdict "..."]
+    Arguments: --run-id <id> --stage <stage> --gate-type <type> --result <approved|rejected>
+               [--verdict "..."] [--criteria-failed "..."] [--criteria-details "..."]
+               [--override-reason "..."]
     """
     run_id = args.run_id
     stage_name = args.stage
     gate_type = args.gate_type
     result_val = args.result
     verdict = getattr(args, "verdict", None) or ""
+    criteria_failed = getattr(args, "criteria_failed", None) or ""
+    criteria_details = getattr(args, "criteria_details", None) or ""
+    override_reason = getattr(args, "override_reason", None) or ""
 
     state = _load_state(run_id)
 
@@ -301,6 +342,22 @@ def cmd_record_gate(args, config: dict) -> None:
 
     if verdict:
         stage_state["gate_verdict"] = verdict
+
+    # Criteria override fields
+    if gate_type == "criteria_override":
+        stage_state["gate_type"] = "criteria_override"
+        if criteria_failed:
+            try:
+                stage_state["criteria_failed"] = json.loads(criteria_failed)
+            except json.JSONDecodeError:
+                stage_state["criteria_failed"] = [criteria_failed]
+        if criteria_details:
+            try:
+                stage_state["criteria_details"] = json.loads(criteria_details)
+            except json.JSONDecodeError:
+                stage_state["criteria_details"] = criteria_details
+        if override_reason:
+            stage_state["override_reason"] = override_reason
 
     _save_state(run_id, state)
 

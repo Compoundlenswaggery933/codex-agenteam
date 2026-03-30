@@ -151,7 +151,9 @@ agenteam_rt.py scope-audit --run-id <id> --stage <stage> --baseline <commit-sha>
 
 Arguments:
 - `--baseline`: the git commit SHA captured before the stage's parallel
-  execution began. The audit compares all changes since this baseline.
+  execution began. The audit checks containment: are all changed files
+  within the union of declared write_scopes for this stage's roles?
+  It does NOT attempt per-role attribution.
 
 ### Provenance: serialized commit capture
 
@@ -224,35 +226,45 @@ Process:
 2. `git status --porcelain` confirms zero unattributed changes remain
 3. If any files fall outside ALL scopes: violation + serial fallback
 
-Returns JSON:
+Returns JSON (containment-only -- no per-role attribution):
+
+Passing (all files within the union of declared scopes):
 ```json
 {
   "stage": "design",
   "baseline": "abc1234",
   "passed": true,
-  "roles": {
-    "architect": {"files_changed": ["docs/designs/api.md"], "out_of_scope": []},
-    "pm": {"files_changed": ["docs/strategies/roadmap.md"], "out_of_scope": []},
-    "researcher": {"files_changed": ["docs/research/caching.md"], "out_of_scope": []}
-  }
+  "files_by_scope": {
+    "docs/designs/**": ["docs/designs/api.md"],
+    "docs/strategies/**": ["docs/strategies/roadmap.md"],
+    "docs/research/**": ["docs/research/caching.md"]
+  },
+  "unclaimed_files": [],
+  "violations": []
 }
 ```
 
-On scope violation:
+Failing (files outside all declared scopes):
 ```json
 {
   "stage": "design",
   "baseline": "abc1234",
   "passed": false,
-  "roles": {
-    "architect": {"files_changed": ["docs/designs/api.md", "docs/strategies/priority.md"], "out_of_scope": ["docs/strategies/priority.md"]},
-    "pm": {"files_changed": ["docs/strategies/roadmap.md"], "out_of_scope": []}
+  "files_by_scope": {
+    "docs/designs/**": ["docs/designs/api.md"],
+    "docs/strategies/**": ["docs/strategies/roadmap.md"]
   },
+  "unclaimed_files": ["src/auth.py"],
   "violations": [
-    {"role": "architect", "file": "docs/strategies/priority.md", "expected_scope": ["docs/designs/**"]}
+    {"file": "src/auth.py", "reason": "outside all declared write_scopes for this stage"}
   ]
 }
 ```
+
+Note: violations report **containment failures** (files outside all scopes)
+and **unattributed working-tree changes** (unclaimed after commit capture).
+They do NOT attribute which role made the edit -- scoped mode cannot
+determine that (see "What scoped mode does NOT guarantee" above).
 
 ### Read-only role handling
 
@@ -277,7 +289,7 @@ as a write_scope violation from a writing role.
 ```json
 {
   "violations": [
-    {"role": "unknown", "file": "src/auth.py", "reason": "file outside all declared write_scopes (possibly from read-only agent)"}
+    {"file": "src/auth.py", "reason": "unclaimed after commit capture (outside all declared write_scopes)"}
   ]
 }
 ```

@@ -112,6 +112,10 @@ If the project config defines a different stage list, follow the config.
 ```
 For each stage in the ordered stage list:
 
+  a0. Capture stage baseline:
+      python3 <runtime>/agenteam_rt.py stage-baseline --run-id <run_id> \
+        --stage <stage> --action capture
+
   a. Get dispatch plan:
      python3 <runtime>/agenteam_rt.py dispatch <stage> \
        --task "<task>" --run-id <run_id>
@@ -181,17 +185,47 @@ For each stage in the ordered stage list:
      - If passed: continue to gate check.
      - If failed and attempts < max_retries:
        Log "Verification failed (attempt N/max). Re-dispatching..."
-       Determine repair role(s):
-         * Single-role stage: re-dispatch that role
-         * Multi-role stage: match failing files to write_scope
-         * All-read-only stage: fail-fast to gate check (no repair possible)
-       Re-dispatch repair role(s) with failure output as context
+       Check verify-plan for rework_to:
+         * If rework_to is set (cross-stage repair):
+           Dispatch rework_roles as REPAIR (no verify/gate on repair action).
+           Record: record-verify --rework-stage <rework_to>
+           Re-run THIS stage's verify (not the rework stage's).
+         * If rework_to is not set (same-stage retry):
+           Determine repair role(s):
+             - Single-role stage: re-dispatch that role
+             - Multi-role stage: match failing files to write_scope
+             - All-read-only stage: fail-fast (no repair possible)
+           Re-dispatch repair role(s) with failure output as context
        Go back to verify
      - If failed and attempts >= max_retries (or no legal repair role):
-       Log "Verification failed after N attempts. Pipeline stopped."
+       Log "Verification failed after N attempts."
+       Offer rollback:
+         result = agenteam_rt.py stage-baseline --run-id <run_id> \
+           --stage <stage> --action rollback
+         If result.allowed:
+           Show: git diff --stat <baseline>..HEAD
+           Ask: "Rollback to pre-stage state? (yes/skip)"
+           If yes: git reset --hard <baseline>
+           Log: "Rolled back stage <stage>"
+         If not result.allowed (isolation:none):
+           Log: "Rollback not available in scoped parallel mode."
        Show failure output to user. Do NOT advance.
 
-  f. Gate check:
+  f. Gate criteria check (if stage has criteria):
+     result = agenteam_rt.py gate-eval --run-id <run_id> --stage <stage>
+     If result.passed: continue to gate.
+     If result.failed:
+       Log: "Gate criteria failed: <failed_criteria>"
+       Escalate to human: "Stage exceeded criteria. Approve anyway? (yes/no)"
+       If approved:
+         python3 <runtime>/agenteam_rt.py record-gate --run-id <run_id> \
+           --stage <stage> --gate-type criteria_override \
+           --result approved --criteria-failed "<list>" \
+           --override-reason "<user's reason>"
+         Continue to gate.
+       If rejected: mark stage failed.
+
+  g. Gate check:
      - If gate is "human": pause and show the user a summary of the
        stage output. Ask: "Approve this stage? (yes/no/details)"
      - If gate is "reviewer" or "qa": dispatch the gate agent as a
@@ -248,6 +282,24 @@ After all stages complete, run final verification:
 
 This is non-negotiable. Final verification is the mechanism that lets
 AgenTeam vouch for its work. It runs AFTER the review stage, not before.
+
+### 6c. Run Report (always, at completion or failure)
+
+After final verification (or when pipeline stops due to failure):
+
+```
+1. Generate report:
+   python3 <runtime>/agenteam_rt.py run-report --run-id <run_id>
+
+2. Render the JSON as markdown and write to the report_path
+   (typically .agenteam/reports/<run-id>.md)
+
+3. Show report summary to user
+
+4. Log: "Run report saved to <report_path>"
+```
+
+Reports are local diagnostics (gitignored). They are never auto-committed.
 
 ### 7. HOTL Wrapper Pipeline
 

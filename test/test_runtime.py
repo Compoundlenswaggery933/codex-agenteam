@@ -2386,3 +2386,712 @@ class TestScopeAudit:
         assert result["passed"] is True
         assert "config/old.yaml" not in result["unclaimed_files"]
         assert "src/new.py" in result["files_by_scope"].get("src/**", [])
+
+
+# ---------------------------------------------------------------------------
+# Run-level timestamps in init (v2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestInitTimestamps:
+    def test_init_includes_started_at(self, tmp_path):
+        """init should include started_at ISO 8601 timestamp."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "timestamp test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert "started_at" in state
+        # ISO 8601 format check (YYYY-MM-DDTHH:MM:SSZ)
+        assert "T" in state["started_at"]
+        assert state["started_at"].endswith("Z")
+
+    def test_init_includes_status_running(self, tmp_path):
+        """init should set status to 'running'."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "status test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert state["status"] == "running"
+
+    def test_init_includes_branch_null(self, tmp_path):
+        """init should set branch to null (populated later by skill)."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "branch test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        state = json.loads(r.stdout)
+        assert state["branch"] is None
+
+
+# ---------------------------------------------------------------------------
+# Cross-stage rework (v2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossStageRework:
+    """Test cross-stage rework in verify-plan and record-verify."""
+
+    @staticmethod
+    def _make_rework_config(tmp_path, stages=None):
+        """Create a config with rework_to on test stage."""
+        if stages is None:
+            stages = [
+                {"name": "implement", "roles": ["dev"], "gate": "auto",
+                 "verify": "python3 -m pytest -v", "max_retries": 2},
+                {"name": "test", "roles": ["qa"], "gate": "auto",
+                 "verify": "python3 -m pytest -v", "max_retries": 2,
+                 "rework_to": "implement"},
+            ]
+        config = {
+            "version": "1",
+            "roles": {
+                "dev": {"can_write": True, "write_scope": ["src/**"]},
+                "qa": {"can_write": True, "write_scope": ["tests/**"]},
+            },
+            "pipeline": {"stages": stages},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_verify_plan_with_rework_to_returns_rework_roles(self, tmp_path):
+        """verify-plan with rework_to returns rework_to and rework_roles."""
+        self._make_rework_config(tmp_path)
+        r = run_rt("verify-plan", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["rework_to"] == "implement"
+        assert "dev" in plan["rework_roles"]
+
+    def test_verify_plan_without_rework_to_has_no_rework_fields(self, tmp_path):
+        """verify-plan without rework_to has no rework_to/rework_roles fields."""
+        self._make_rework_config(tmp_path)
+        r = run_rt("verify-plan", "implement", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "rework_to" not in plan
+        assert "rework_roles" not in plan
+
+    def test_record_verify_with_rework_stage(self, tmp_path):
+        """record-verify with --rework-stage stores it in verify_attempts."""
+        self._make_rework_config(tmp_path)
+        r_init = run_rt("init", "--task", "rework test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        r = run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "test", "--result", "fail",
+            "--output", "2 tests failed",
+            "--rework-stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+
+        # Check state
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        attempts = state["stages"]["test"]["verify_attempts"]
+        assert len(attempts) == 1
+        assert attempts[0]["rework_stage"] == "implement"
+
+    def test_rework_to_nonexistent_stage_returns_error(self, tmp_path):
+        """rework_to pointing to a nonexistent stage returns error."""
+        stages = [
+            {"name": "test", "roles": ["qa"], "gate": "auto",
+             "verify": "python3 -m pytest -v", "max_retries": 2,
+             "rework_to": "nonexistent"},
+        ]
+        self._make_rework_config(tmp_path, stages=stages)
+        r = run_rt("verify-plan", "test", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Per-stage rollback (v2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestStageBaseline:
+    """Test cmd_stage_baseline capture and rollback with temp git repos."""
+
+    @staticmethod
+    def _init_git_repo(path):
+        """Initialize a git repo with an initial commit."""
+        subprocess.run(["git", "init"], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _get_head(path):
+        """Get HEAD sha."""
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(path), capture_output=True, text=True, check=True,
+        )
+        return r.stdout.strip()
+
+    @staticmethod
+    def _make_baseline_config(tmp_path, isolation="branch"):
+        config = {
+            "version": "1",
+            "isolation": isolation,
+            "pipeline": {
+                "stages": [
+                    {"name": "implement", "roles": ["dev"], "gate": "auto"},
+                    {"name": "test", "roles": ["qa"], "gate": "auto"},
+                ]
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_capture_stores_correct_sha(self, tmp_path):
+        """stage-baseline capture stores the correct HEAD SHA."""
+        self._init_git_repo(tmp_path)
+        self._make_baseline_config(tmp_path)
+        expected_sha = self._get_head(tmp_path)
+
+        r_init = run_rt("init", "--task", "baseline test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        r = run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "capture",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["baseline"] == expected_sha
+        assert result["action"] == "capture"
+
+        # Verify state file
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        assert state["stages"]["implement"]["baseline"] == expected_sha
+
+    def test_rollback_returns_stored_sha(self, tmp_path):
+        """stage-baseline rollback returns the stored baseline SHA."""
+        self._init_git_repo(tmp_path)
+        self._make_baseline_config(tmp_path)
+
+        r_init = run_rt("init", "--task", "rollback test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Capture first
+        run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "capture",
+            cwd=str(tmp_path),
+        )
+
+        # Rollback
+        r = run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "rollback",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["action"] == "rollback"
+        assert result["allowed"] is True
+        assert len(result["baseline"]) == 40  # Full SHA
+
+    def test_isolation_none_rollback_not_allowed(self, tmp_path):
+        """Rollback in isolation:none returns allowed:false."""
+        self._init_git_repo(tmp_path)
+        self._make_baseline_config(tmp_path, isolation="none")
+
+        r_init = run_rt("init", "--task", "none test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Capture
+        run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "capture",
+            cwd=str(tmp_path),
+        )
+
+        # Rollback should be disallowed
+        r = run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "rollback",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["allowed"] is False
+        assert "reason" in result
+
+    def test_isolation_branch_rollback_allowed(self, tmp_path):
+        """Rollback in isolation:branch returns allowed:true."""
+        self._init_git_repo(tmp_path)
+        self._make_baseline_config(tmp_path, isolation="branch")
+
+        r_init = run_rt("init", "--task", "branch test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Capture
+        run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "capture",
+            cwd=str(tmp_path),
+        )
+
+        r = run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "rollback",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["allowed"] is True
+
+    def test_no_baseline_returns_error(self, tmp_path):
+        """Rollback with no captured baseline returns error."""
+        self._init_git_repo(tmp_path)
+        self._make_baseline_config(tmp_path)
+
+        r_init = run_rt("init", "--task", "no baseline", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        r = run_rt(
+            "stage-baseline", "--run-id", run_id,
+            "--stage", "implement", "--action", "rollback",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "No baseline" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Run report (v2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReport:
+    """Test cmd_run_report JSON assembly."""
+
+    @staticmethod
+    def _write_state(tmp_path, state):
+        """Write a state file for testing."""
+        state_dir = tmp_path / ".agenteam" / "state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        run_id = state["run_id"]
+        with open(state_dir / f"{run_id}.json", "w") as f:
+            json.dump(state, f)
+
+    @staticmethod
+    def _make_report_config(tmp_path):
+        config = {
+            "version": "1",
+            "pipeline": {
+                "stages": [
+                    {"name": "implement", "roles": ["dev"], "gate": "auto"},
+                    {"name": "test", "roles": ["qa"], "gate": "auto"},
+                ]
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_completed_run_includes_all_stages(self, tmp_path):
+        """Report for a completed run includes all stages."""
+        self._make_report_config(tmp_path)
+        state = {
+            "run_id": "20260330T150000Z",
+            "task": "Add auth",
+            "status": "completed",
+            "started_at": "2026-03-30T15:00:00Z",
+            "completed_at": "2026-03-30T15:04:32Z",
+            "branch": "ateam/run/20260330T150000Z",
+            "stages": {
+                "implement": {
+                    "status": "passed",
+                    "roles": ["dev"],
+                    "gate": "auto",
+                    "verify_result": "pass",
+                    "verify_attempts": [{"attempt": 1, "result": "pass"}],
+                    "gate_result": "approved",
+                },
+                "test": {
+                    "status": "passed",
+                    "roles": ["qa"],
+                    "gate": "auto",
+                    "verify_result": "pass",
+                    "verify_attempts": [{"attempt": 1, "result": "pass"}],
+                    "gate_result": "approved",
+                },
+            },
+            "write_locks": {"active": None, "queue": []},
+        }
+        self._write_state(tmp_path, state)
+
+        r = run_rt("run-report", "--run-id", "20260330T150000Z", cwd=str(tmp_path))
+        assert r.returncode == 0
+        report = json.loads(r.stdout)
+        assert report["run_id"] == "20260330T150000Z"
+        assert report["task"] == "Add auth"
+        assert report["status"] == "completed"
+        assert len(report["stages"]) == 2
+        stage_names = [s["name"] for s in report["stages"]]
+        assert "implement" in stage_names
+        assert "test" in stage_names
+
+    def test_run_with_rework_includes_rework_history(self, tmp_path):
+        """Report with rework attempts includes rework_history."""
+        self._make_report_config(tmp_path)
+        state = {
+            "run_id": "20260330T160000Z",
+            "task": "Add feature",
+            "status": "completed",
+            "started_at": "2026-03-30T16:00:00Z",
+            "branch": None,
+            "stages": {
+                "implement": {
+                    "status": "passed",
+                    "roles": ["dev"],
+                    "gate": "auto",
+                },
+                "test": {
+                    "status": "passed",
+                    "roles": ["qa"],
+                    "gate": "auto",
+                    "verify_result": "pass",
+                    "verify_attempts": [
+                        {"attempt": 1, "result": "fail", "rework_stage": "implement"},
+                        {"attempt": 2, "result": "pass"},
+                    ],
+                },
+            },
+            "write_locks": {"active": None, "queue": []},
+        }
+        self._write_state(tmp_path, state)
+
+        r = run_rt("run-report", "--run-id", "20260330T160000Z", cwd=str(tmp_path))
+        assert r.returncode == 0
+        report = json.loads(r.stdout)
+        assert len(report["rework_history"]) == 1
+        assert report["rework_history"][0]["rework_stage"] == "implement"
+        assert report["rework_history"][0]["stage"] == "test"
+
+    def test_includes_final_verify_results(self, tmp_path):
+        """Report includes final_verify_results from state."""
+        self._make_report_config(tmp_path)
+        state = {
+            "run_id": "20260330T170000Z",
+            "task": "Final verify test",
+            "status": "completed",
+            "started_at": "2026-03-30T17:00:00Z",
+            "branch": None,
+            "final_verify_results": [
+                {"command": "python3 -m pytest -v", "passed": True},
+                {"command": "ruff check .", "passed": True},
+            ],
+            "stages": {
+                "implement": {"status": "passed", "roles": ["dev"], "gate": "auto"},
+            },
+            "write_locks": {"active": None, "queue": []},
+        }
+        self._write_state(tmp_path, state)
+
+        r = run_rt("run-report", "--run-id", "20260330T170000Z", cwd=str(tmp_path))
+        assert r.returncode == 0
+        report = json.loads(r.stdout)
+        assert len(report["final_verify_results"]) == 2
+        assert report["final_verify_results"][0]["command"] == "python3 -m pytest -v"
+        assert report["final_verify_results"][0]["passed"] is True
+
+    def test_report_path_under_agenteam_reports(self, tmp_path):
+        """report_path should be under .agenteam/reports/."""
+        self._make_report_config(tmp_path)
+        state = {
+            "run_id": "20260330T180000Z",
+            "task": "Path test",
+            "status": "completed",
+            "started_at": "2026-03-30T18:00:00Z",
+            "branch": None,
+            "stages": {},
+            "write_locks": {"active": None, "queue": []},
+        }
+        self._write_state(tmp_path, state)
+
+        r = run_rt("run-report", "--run-id", "20260330T180000Z", cwd=str(tmp_path))
+        assert r.returncode == 0
+        report = json.loads(r.stdout)
+        assert report["report_path"].startswith(".agenteam/reports/")
+        assert report["report_path"].endswith(".md")
+
+    def test_includes_criteria_override_details(self, tmp_path):
+        """Report includes criteria override details from gate."""
+        self._make_report_config(tmp_path)
+        state = {
+            "run_id": "20260330T190000Z",
+            "task": "Criteria override test",
+            "status": "completed",
+            "started_at": "2026-03-30T19:00:00Z",
+            "branch": None,
+            "stages": {
+                "implement": {
+                    "status": "passed",
+                    "roles": ["dev"],
+                    "gate": "human",
+                    "gate_result": "approved",
+                    "gate_type": "criteria_override",
+                    "criteria_failed": ["max_files_changed"],
+                    "criteria_details": {"max_files_changed": {"configured": 15, "actual": 23}},
+                    "override_reason": "Bulk rename",
+                },
+            },
+            "write_locks": {"active": None, "queue": []},
+        }
+        self._write_state(tmp_path, state)
+
+        r = run_rt("run-report", "--run-id", "20260330T190000Z", cwd=str(tmp_path))
+        assert r.returncode == 0
+        report = json.loads(r.stdout)
+        impl_stage = [s for s in report["stages"] if s["name"] == "implement"][0]
+        assert impl_stage["gate"]["gate_type"] == "criteria_override"
+        assert "max_files_changed" in impl_stage["gate"]["criteria_failed"]
+        assert impl_stage["gate"]["override_reason"] == "Bulk rename"
+
+
+# ---------------------------------------------------------------------------
+# Gate criteria evaluation (v2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestGateEval:
+    """Test cmd_gate_eval with temp git repos."""
+
+    @staticmethod
+    def _init_git_repo(path):
+        """Initialize a git repo with an initial commit."""
+        subprocess.run(["git", "init"], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _get_head(path):
+        """Get HEAD sha."""
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(path), capture_output=True, text=True, check=True,
+        )
+        return r.stdout.strip()
+
+    @staticmethod
+    def _commit_file(path, filepath, content="x"):
+        """Create/write a file and commit it."""
+        fpath = path / filepath
+        fpath.parent.mkdir(parents=True, exist_ok=True)
+        fpath.write_text(content)
+        subprocess.run(["git", "add", str(filepath)], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"add {filepath}"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _make_gate_config(tmp_path, criteria=None):
+        stages = [
+            {"name": "implement", "roles": ["dev"], "gate": "auto"},
+        ]
+        if criteria is not None:
+            stages[0]["criteria"] = criteria
+        config = {
+            "version": "1",
+            "pipeline": {"stages": stages},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def _setup_run_with_baseline(self, tmp_path, criteria=None):
+        """Init git repo, create config, init run, capture baseline, return (run_id, baseline_sha)."""
+        self._init_git_repo(tmp_path)
+        self._make_gate_config(tmp_path, criteria=criteria)
+        baseline_sha = self._get_head(tmp_path)
+
+        r_init = run_rt("init", "--task", "gate test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Write baseline directly into state (stage-baseline capture needs git)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["implement"]["baseline"] = baseline_sha
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+
+        return run_id, baseline_sha
+
+    def test_max_files_changed_exceeded(self, tmp_path):
+        """max_files_changed exceeded returns failed_criteria."""
+        run_id, _ = self._setup_run_with_baseline(
+            tmp_path, criteria={"max_files_changed": 1}
+        )
+
+        # Create 2 files (exceeds max of 1)
+        self._commit_file(tmp_path, "src/a.py", "a")
+        self._commit_file(tmp_path, "src/b.py", "b")
+
+        r = run_rt(
+            "gate-eval", "--run-id", run_id,
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is False
+        assert "max_files_changed" in result["failed_criteria"]
+        assert result["criteria"]["max_files_changed"]["actual"] == 2
+        assert result["criteria"]["max_files_changed"]["configured"] == 1
+
+    def test_scope_paths_violation(self, tmp_path):
+        """scope_paths violation returns failed_criteria."""
+        run_id, _ = self._setup_run_with_baseline(
+            tmp_path, criteria={"scope_paths": ["src/**"]}
+        )
+
+        # Create a file outside scope
+        self._commit_file(tmp_path, "config/settings.yaml", "key: val")
+
+        r = run_rt(
+            "gate-eval", "--run-id", run_id,
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is False
+        assert "scope_paths" in result["failed_criteria"]
+        assert "config/settings.yaml" in result["criteria"]["scope_paths"]["actual_out_of_scope"]
+
+    def test_requires_tests_with_no_test_files(self, tmp_path):
+        """requires_tests with no test files returns failed_criteria."""
+        run_id, _ = self._setup_run_with_baseline(
+            tmp_path, criteria={"requires_tests": True}
+        )
+
+        # Create a non-test file only
+        self._commit_file(tmp_path, "src/main.py", "code")
+
+        r = run_rt(
+            "gate-eval", "--run-id", run_id,
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is False
+        assert "requires_tests" in result["failed_criteria"]
+        assert result["criteria"]["requires_tests"]["test_files_found"] is False
+
+    def test_all_criteria_met(self, tmp_path):
+        """All criteria met returns passed:true."""
+        run_id, _ = self._setup_run_with_baseline(
+            tmp_path, criteria={
+                "max_files_changed": 5,
+                "scope_paths": ["src/**", "tests/**"],
+                "requires_tests": True,
+            }
+        )
+
+        # Create files within scope including a test file
+        self._commit_file(tmp_path, "src/app.py", "app code")
+        self._commit_file(tmp_path, "tests/test_app.py", "test code")
+
+        r = run_rt(
+            "gate-eval", "--run-id", run_id,
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is True
+        assert result["failed_criteria"] == []
+        assert result["criteria"]["max_files_changed"]["passed"] is True
+        assert result["criteria"]["scope_paths"]["passed"] is True
+        assert result["criteria"]["requires_tests"]["passed"] is True
+
+    def test_no_criteria_configured_passes(self, tmp_path):
+        """No criteria configured returns passed:true with empty criteria."""
+        run_id, _ = self._setup_run_with_baseline(tmp_path, criteria=None)
+
+        # Create some files
+        self._commit_file(tmp_path, "src/anything.py", "stuff")
+
+        r = run_rt(
+            "gate-eval", "--run-id", run_id,
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is True
+        assert result["criteria"] == {}
+        assert result["failed_criteria"] == []
+
+    def test_criteria_override_via_record_gate(self, tmp_path):
+        """Criteria override via record-gate with gate_type:criteria_override."""
+        self._init_git_repo(tmp_path)
+        self._make_gate_config(tmp_path, criteria={"max_files_changed": 1})
+
+        r_init = run_rt("init", "--task", "override test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Record a criteria_override gate
+        r = run_rt(
+            "record-gate", "--run-id", run_id,
+            "--stage", "implement",
+            "--gate-type", "criteria_override",
+            "--result", "approved",
+            "--verdict", "Criteria override: max_files_changed (23 > 15)",
+            "--criteria-failed", '["max_files_changed"]',
+            "--criteria-details", '{"max_files_changed": {"configured": 15, "actual": 23}}',
+            "--override-reason", "Bulk rename across 23 files",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+
+        # Verify state
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        stage = state["stages"]["implement"]
+        assert stage["gate_type"] == "criteria_override"
+        assert stage["criteria_failed"] == ["max_files_changed"]
+        assert stage["criteria_details"]["max_files_changed"]["configured"] == 15
+        assert stage["override_reason"] == "Bulk rename across 23 files"

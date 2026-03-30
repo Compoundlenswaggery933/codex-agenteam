@@ -64,11 +64,16 @@ pipeline:
       roles: [dev]
       gate: auto
       max_retries: 2
+      # criteria:                   # lightweight gate checks (optional)
+      #   max_files_changed: 15     # block if too many files changed
+      #   scope_paths: ["src/**"]   # block if files outside these patterns
+      #   requires_tests: true      # block if no test files modified
 
     - name: test
       roles: [qa]
       gate: auto
       max_retries: 1
+      rework_to: implement          # on test failure, dispatch dev to fix code first
 
     - name: review
       roles: [reviewer]

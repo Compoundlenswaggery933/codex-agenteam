@@ -36,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     # init
     p_init = sub.add_parser("init", help="Initialize a run")
     p_init.add_argument("--task", required=False, default="unnamed task")
+    p_init.add_argument("--profile", required=False, default=None)
 
     # generate
     sub.add_parser("generate", help="Generate .codex/agents/*.toml")

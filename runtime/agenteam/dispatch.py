@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .config import resolve_team_config
 from .roles import resolve_roles
-from .state import get_pipeline_stages
+from .state import get_pipeline_stages, resolve_stages_for_run
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +88,8 @@ def cmd_dispatch(args, config: dict) -> None:
     stage_name = args.stage
     task = args.task or ""
 
-    stages = get_pipeline_stages(config)
+    run_id = getattr(args, "run_id", None)
+    stages = resolve_stages_for_run(run_id, config)
     stage_config = None
     for s in stages:
         if s["name"] == stage_name:
@@ -199,7 +200,8 @@ def cmd_scope_audit(args, config: dict) -> None:
     stage_name = args.stage
     baseline = args.baseline
 
-    stages = get_pipeline_stages(config)
+    run_id = getattr(args, "run_id", None)
+    stages = resolve_stages_for_run(run_id, config)
     stage_config = None
     for s in stages:
         if s["name"] == stage_name:

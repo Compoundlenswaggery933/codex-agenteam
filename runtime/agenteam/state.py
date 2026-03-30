@@ -50,6 +50,67 @@ def set_stage_field(run_id: str, stage: str, field: str, value) -> None:
         json.dump(state, f, indent=2)
 
 
+def resolve_effective_stages(config: dict, profile: str | None) -> list[dict]:
+    """Resolve the effective stage list, optionally filtered by a profile.
+
+    Returns full stage config dicts in pipeline.stages order.
+    """
+    all_stages = get_pipeline_stages(config)
+    if not profile:
+        return all_stages
+
+    # Implicit 'full' profile = all stages
+    pipeline = config.get("pipeline", {})
+    profiles = pipeline.get("profiles", {}) if isinstance(pipeline, dict) else {}
+
+    if profile == "full" and profile not in profiles:
+        return all_stages
+
+    profile_def = profiles.get(profile)
+    if not profile_def:
+        print(
+            json.dumps({"error": f"Unknown profile '{profile}'"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    profile_stage_names = set(profile_def.get("stages", []))
+    effective = [s for s in all_stages if s["name"] in profile_stage_names]
+
+    if not effective:
+        print(
+            json.dumps({"error": f"Profile '{profile}' resolves to zero stages"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return effective
+
+
+def resolve_stages_for_run(run_id: str | None, config: dict) -> list[dict]:
+    """Return stages from run state if run_id exists, else from config.
+
+    When a run_id is provided and state exists, stages are reconstructed
+    entirely from the state snapshot — config is not consulted.
+    """
+    if run_id:
+        state_path = Path.cwd() / ".agenteam" / "state" / f"{run_id}.json"
+        if state_path.exists():
+            with open(state_path) as f:
+                state = json.load(f)
+            stage_order = state.get("stage_order", [])
+            stages_map = state.get("stages", {})
+            result = []
+            for name in stage_order:
+                if name in stages_map:
+                    stage_dict = {"name": name}
+                    stage_dict.update(stages_map[name])
+                    result.append(stage_dict)
+            if result:
+                return result
+    return get_pipeline_stages(config)
+
+
 def cmd_init(args, config: dict) -> None:
     """Initialize a run: validate config, create state."""
     task = args.task or "unnamed task"
@@ -62,7 +123,8 @@ def cmd_init(args, config: dict) -> None:
     # Build initial state
     pipeline_mode, _ = resolve_team_config(config)
     pipeline_mode = pipeline_mode or "standalone"
-    stages = get_pipeline_stages(config)
+    profile = getattr(args, "profile", None)
+    stages = resolve_effective_stages(config, profile)
 
     # Compute config hash for resume drift detection
     config_hash = ""
@@ -73,11 +135,14 @@ def cmd_init(args, config: dict) -> None:
         pass
 
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    stage_order = [s["name"] for s in stages]
 
     state: dict = {
         "run_id": run_id,
         "task": task,
         "pipeline_mode": pipeline_mode,
+        "profile": profile,
+        "stage_order": stage_order,
         "current_stage": stages[0]["name"] if stages else None,
         "started_at": now,
         "last_update": now,
@@ -96,6 +161,11 @@ def cmd_init(args, config: dict) -> None:
             "status": "pending",
             "roles": stage.get("roles", []),
             "gate": stage.get("gate", "auto"),
+            "verify": stage.get("verify"),
+            "verify_safe": stage.get("verify_safe"),
+            "max_retries": stage.get("max_retries", 0),
+            "rework_to": stage.get("rework_to"),
+            "criteria": stage.get("criteria", {}),
         }
 
     # Write state file

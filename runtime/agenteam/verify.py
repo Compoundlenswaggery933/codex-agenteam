@@ -8,7 +8,7 @@ from pathlib import Path
 from .config import resolve_team_config
 from .events import append_event
 from .roles import resolve_roles
-from .state import get_pipeline_stages
+from .state import get_pipeline_stages, resolve_stages_for_run
 
 
 def detect_verify_command(cwd: str | None = None) -> str | None:
@@ -126,7 +126,7 @@ def cmd_verify_plan(args, config: dict) -> None:
     stage_name = args.stage
     run_id = getattr(args, "run_id", None)
 
-    stages = get_pipeline_stages(config)
+    stages = resolve_stages_for_run(run_id, config)
     stage_config = None
     for s in stages:
         if s["name"] == stage_name:
@@ -260,8 +260,8 @@ def cmd_record_verify(args, config: dict) -> None:
     _save_state(run_id, state)
 
     # Emit stage_verified event
-    # Resolve verify command from config stages
-    stages = get_pipeline_stages(config)
+    # Resolve verify command from state (if run-scoped) or config
+    stages = resolve_stages_for_run(run_id, config)
     verify_cmd = ""
     for s in stages:
         if s["name"] == stage_name:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .config import find_config, load_config, resolve_team_config
 from .events import list_events
-from .state import get_pipeline_stages
+from .state import get_pipeline_stages, resolve_stages_for_run
 
 # Stale threshold in seconds (10 minutes).
 STALE_THRESHOLD = 600
@@ -156,7 +156,7 @@ def cmd_resume_plan(args, config: dict) -> None:
     if interrupted:
         stage_name = interrupted["name"]
         # Find stage config for verify details
-        pipeline_stages = get_pipeline_stages(config)
+        pipeline_stages = resolve_stages_for_run(run_id, config)
         stage_config = None
         for s in pipeline_stages:
             if s["name"] == stage_name:
@@ -187,7 +187,7 @@ def cmd_resume_plan(args, config: dict) -> None:
 
     # Completed and remaining stages
     stages = state.get("stages", {})
-    pipeline_stages = get_pipeline_stages(config)
+    pipeline_stages = resolve_stages_for_run(run_id, config)
     stage_order = [s["name"] for s in pipeline_stages]
 
     completed_stages = [n for n in stage_order if stages.get(n, {}).get("status") == "completed"]

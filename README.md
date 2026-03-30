@@ -1,47 +1,77 @@
 <p align="center">
-  <img src="assets/agenteam-banner.png" alt="AgenTeam -- Research, Design, Build, Review" width="100%">
+  <img src="assets/agenteam-banner.png" alt="AgenTeam — Role-based AI team for Codex" width="100%">
 </p>
 
 <p align="center">
-  <strong>Specialist AI agents orchestrated as a configurable team pipeline for Codex.</strong>
+  <a href="https://github.com/yimwoo/codex-agenteam/releases"><img src="https://img.shields.io/github/v/release/yimwoo/codex-agenteam?color=2563EB&label=version&style=flat-square" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2563EB?style=flat-square" alt="MIT License"></a>
+  <a href="https://github.com/yimwoo/codex-agenteam/stargazers"><img src="https://img.shields.io/github/stars/yimwoo/codex-agenteam?color=2563EB&style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/yimwoo/codex-agenteam/issues"><img src="https://img.shields.io/github/issues/yimwoo/codex-agenteam?color=2563EB&style=flat-square" alt="Issues"></a>
 </p>
+
+<p align="center">
+  <strong>A full AI development team — researcher, PM, architect, dev, QA, and reviewer — as native Codex agents, orchestrated through a configurable pipeline.</strong>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> · <a href="#your-team">Meet the Team</a> · <a href="#pipeline">Pipeline</a> · <a href="#configuration">Configuration</a> · <a href="#cli-reference">CLI Reference</a>
+</p>
+
+---
+
+## Why AgenTeam?
+
+Most AI coding tools give you one agent. AgenTeam gives you a team.
+
+Each role has a focused job, a scoped write area, and a place in the pipeline. The result: less context confusion, safer parallel execution, and a workflow that mirrors how real software teams operate.
+
+```
+You → @ATeam "add user authentication"
+         ↓
+   Researcher  →  PM  →  Architect  →  Dev  →  Qa  →  Reviewer
+   (explore)    (spec)    (design)     (implement)  (test)   (sign off)
+```
+
+Every stage writes to its own directory. Nothing overlaps. Every gate is yours to approve.
 
 ---
 
 ## Quick Start
 
-**Install:**
+**1. Install:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
 ```
 
-Restart Codex, go to **Plugins > Local Plugins**, and install AgenTeam.
+**2.** Restart Codex → **Plugins → Local Plugins** → install AgenTeam.
 
-**Use it:**
+**3. Initialize your team:**
 
 ```
 @ATeam build my team
 ```
 
-That's it. AgenTeam creates your config, generates the agents, and shows your team.
+AgenTeam creates your config, generates all six agents, and shows your roster. Done.
 
 ---
 
 ## Your Team
 
-After setup, type `@` in Codex to see your team:
+Once initialized, type `@` in Codex to see your full team roster:
 
-| Role | @ Mention | What They Do |
-|------|-----------|-------------|
-| Researcher | `@Researcher` | Investigates web, GitHub, docs, community trends |
-| PM | `@Pm` | Decides what to build, prioritizes, writes specs |
-| Architect | `@Architect` | Designs systems, critiques plans, identifies risks |
-| Dev | `@Dev` | Translates designs into plans, writes production code |
-| QA | `@Qa` | Writes unit and integration tests |
-| Reviewer | `@Reviewer` | Reviews for correctness, security, and regressions |
+| Role | Mention | Responsibility |
+|------|---------|----------------|
+| 🔍 Researcher | `@Researcher` | Investigates docs, GitHub, community trends, and prior art |
+| 📋 PM | `@Pm` | Decides what to build, prioritizes work, writes specs |
+| 🏗️ Architect | `@Architect` | Designs systems, critiques plans, identifies risks |
+| 💻 Dev | `@Dev` | Translates designs into plans, writes production code |
+| 🧪 Qa | `@Qa` | Writes unit and integration tests, catches regressions |
+| 👁️ Reviewer | `@Reviewer` | Reviews for correctness, security, and code quality |
 
-Talk to any role directly:
+### Talk to any role directly
+
+Skip the pipeline and go straight to the specialist you need:
 
 ```
 @Architect review this API design
@@ -52,11 +82,11 @@ Talk to any role directly:
 @Reviewer review the queue fix and test
 ```
 
-Use `@ATeam` for team-level operations:
+### Use @ATeam for team-level tasks
 
 ```
-@ATeam refactor this codebase to be more maintainable
-@ATeam deepdive
+@ATeam let's have a standup meeting
+@ATeam do a deep dive on this project
 @ATeam add a security auditor that focuses on OWASP top 10
 ```
 
@@ -64,23 +94,25 @@ Use `@ATeam` for team-level operations:
 
 ## Pipeline
 
-When you give `@ATeam` a task, it orchestrates the full pipeline:
+When you give `@ATeam` a task, it runs the full development pipeline:
 
-```
-research --> strategy --> design --> plan --> implement --> test --> review
-   |            |           |          |          |           |         |
-   v            v           v          v          v           v         v
-  docs/      docs/       docs/     docs/      src/**      tests/**  (verdict)
-  research/  strategies/ designs/   plans/     lib/**
-```
+| Stage | Role(s) | Output | Gate |
+|-------|---------|--------|------|
+| Research | Researcher | `docs/research/` | auto |
+| Strategy | PM | `docs/strategies/` | **human** |
+| Design | Architect, PM, Researcher | `docs/designs/` | **human** |
+| Plan | Dev | `docs/plans/` | **human** |
+| Implement | Dev | `src/**`, `lib/**` | auto |
+| Test | Qa | `tests/**` | auto |
+| Review | Reviewer | verdict | **human** |
 
-Each role writes to a scoped directory -- no overlaps, safe for parallel execution.
+Each role writes to a scoped directory — no overlaps, safe for parallel execution. Human gates pause the pipeline until you approve.
 
 ---
 
 ## Add Team Members
 
-Need a specialist? Just ask:
+Need a specialist that isn't in the default roster? Just ask:
 
 ```
 @ATeam add a security auditor that focuses on auth and data leaks
@@ -111,7 +143,7 @@ roles:
       - "lib/**"
       - "docs/plans/**"
 
-  # Add custom roles
+  # Add custom roles:
   security_auditor:
     description: "Reviews code for security vulnerabilities"
     participates_in: [review]
@@ -146,17 +178,17 @@ pipeline:
 
 ### Branch Isolation
 
-Writing agents are automatically isolated on dedicated branches -- they never work directly on your current branch.
+Writing agents are automatically isolated on dedicated branches — they never touch your current branch directly.
 
-| Isolation | What Happens |
-|-----------|-------------|
-| `branch` (default) | Creates `ateam/<role>/<task>` branch per assignment |
-| `worktree` | Creates isolated git worktree per writer |
-| `none` | Stays on current branch (trusts non-overlapping write scopes) |
+| Mode | Behavior |
+|------|----------|
+| `branch` *(default)* | Creates `ateam/<role>/<task>` branch per assignment |
+| `worktree` | Creates an isolated git worktree per writer |
+| `none` | Stays on current branch (relies on non-overlapping write scopes) |
 
 ### HOTL Integration
 
-AgenTeam auto-detects the [HOTL plugin](https://github.com/yimwoo/hotl). When available, AgenTeam is the outer orchestrator (who does what, write policy) and HOTL is the inner engine (loops, verification, gates). Force it with `pipeline: hotl`.
+AgenTeam auto-detects the [HOTL plugin](https://github.com/yimwoo/hotl). When present, AgenTeam is the outer orchestrator (who does what, write policy) and HOTL is the inner engine (loops, verification, gates). Force it explicitly with `pipeline: hotl`.
 
 ---
 
@@ -167,15 +199,15 @@ For Codex CLI users:
 | Command | Purpose |
 |---------|---------|
 | `$ateam:init` | Set up team config and generate agents |
-| `$ateam:run "task"` | Run the full pipeline |
-| `$ateam:status` | Show team status |
+| `$ateam:run "task"` | Run the full pipeline on a task |
+| `$ateam:status` | Show team status and current config |
 | `$ateam:add-member` | Add a custom team member |
 | `$ateam:generate` | Regenerate agents after config changes |
 | `$ateam:standup` | Quick project status report |
 
 ---
 
-## Install / Update
+## Install & Update
 
 ```bash
 # Install
@@ -184,7 +216,7 @@ curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.
 # Update
 curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/update.sh | bash
 
-# Local install (contributors)
+# Local install (for contributors)
 git clone https://github.com/yimwoo/codex-agenteam.git
 cd codex-agenteam
 bash install.sh --local
@@ -194,6 +226,14 @@ bash install.sh --local
 
 ---
 
+## Contributing
+
+Found a bug or have a role idea? [Open an issue](https://github.com/yimwoo/codex-agenteam/issues) or submit a PR. Custom role configs and pipeline presets are especially welcome.
+
+If AgenTeam is useful to you, a ⭐ goes a long way.
+
+---
+
 ## License
 
-MIT
+MIT © [Yiming Wu](https://github.com/yimwoo)

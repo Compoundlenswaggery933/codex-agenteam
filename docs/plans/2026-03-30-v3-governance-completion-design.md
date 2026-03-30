@@ -1,4 +1,4 @@
-# AgenTeam v3: Governance Completion
+# AgenTeam v2.2: Governance Completion
 
 **Date:** 2026-03-30
 **Status:** Draft

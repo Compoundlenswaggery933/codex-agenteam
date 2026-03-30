@@ -66,6 +66,8 @@ Need a specialist? `@ATeam add a security auditor that focuses on OWASP top 10`
 
 Most AI coding tools give you one agent. AgenTeam gives you a team. Each role has a focused job, a scoped write area, and a place in the pipeline — less context confusion, safer parallel execution, and a workflow that mirrors how real teams operate.
 
+AgenTeam remembers what happened in previous runs. Each completed run's summary and lessons (verify failures, rework paths, gate decisions) are persisted and injected as context into future runs when relevant.
+
 ---
 
 ## Documentation

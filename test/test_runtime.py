@@ -5086,3 +5086,153 @@ class TestMigration:
         import re
 
         assert re.search(r"\.bak-\d{8}T\d{6}Z", backup)
+
+
+# ---------------------------------------------------------------------------
+# History (cross-run context)
+# ---------------------------------------------------------------------------
+
+
+class TestHistory:
+    def _init_run(self, tmp_path):
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "history test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_history_append_creates_file(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["run_id"] == run_id
+        assert result["task"] == "history test"
+        assert "lessons" in result
+
+        history_path = tmp_path / ".agenteam" / "history" / f"{run_id}.json"
+        assert history_path.exists()
+
+    def test_history_append_includes_profile(self, tmp_path):
+        import yaml
+        with open(TEMPLATE) as f:
+            config = yaml.safe_load(f)
+        config["pipeline"]["profiles"] = {"quick": {"stages": ["implement", "test"]}}
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("init", "--task", "profile test", "--profile", "quick", cwd=str(tmp_path))
+        assert r.returncode == 0
+        run_id = json.loads(r.stdout)["run_id"]
+
+        r = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["profile"] == "quick"
+
+    def test_history_append_lessons_structure(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        lessons = result["lessons"]
+        assert "verify_failures" in lessons
+        assert "rework_edges" in lessons
+        assert "gate_rejections" in lessons
+        assert "gate_overrides" in lessons
+        assert "final_verify_passed" in lessons
+        assert "total_stages" in lessons
+        assert "completed_stages" in lessons
+        assert "profile_used" in lessons
+
+    def test_history_append_idempotent(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r1 = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r1.returncode == 0
+        r2 = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r2.returncode == 0
+        # Both should produce identical output
+        assert json.loads(r1.stdout)["run_id"] == json.loads(r2.stdout)["run_id"]
+
+    def test_history_append_captures_verify_failures(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        # Manually add verify attempts with a failure
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["implement"]["verify_attempts"] = [
+            {"attempt": 1, "result": "fail"},
+            {"attempt": 2, "result": "pass"},
+        ]
+        state["stages"]["implement"]["verify_result"] = "pass"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        r = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        failures = result["lessons"]["verify_failures"]
+        assert len(failures) == 1
+        assert failures[0]["stage"] == "implement"
+        assert failures[0]["attempts"] == 2
+        assert failures[0]["final_result"] == "pass"
+
+    def _create_synthetic_history(self, tmp_path, count):
+        """Helper: create N history entries with distinct IDs."""
+        history_dir = tmp_path / ".agenteam" / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        run_ids = []
+        for i in range(count):
+            rid = f"2026033{i}T{10 + i:02d}0000Z"
+            entry = {
+                "run_id": rid,
+                "task": f"task-{i}",
+                "status": "completed",
+                "profile": None,
+                "stages": [],
+                "rework_history": [],
+                "lessons": {
+                    "verify_failures": [],
+                    "rework_edges": [],
+                    "gate_rejections": [],
+                    "gate_overrides": [],
+                    "final_verify_passed": True,
+                    "total_stages": 7,
+                    "completed_stages": 7,
+                    "profile_used": None,
+                },
+            }
+            with open(history_dir / f"{rid}.json", "w") as f:
+                json.dump(entry, f)
+            run_ids.append(rid)
+        return run_ids
+
+    def test_history_list_returns_entries(self, tmp_path):
+        self._create_synthetic_history(tmp_path, 3)
+        r = run_rt("history", "list", cwd=str(tmp_path))
+        assert r.returncode == 0
+        entries = json.loads(r.stdout)
+        assert len(entries) == 3
+
+    def test_history_list_reverse_chronological(self, tmp_path):
+        run_ids = self._create_synthetic_history(tmp_path, 3)
+        r = run_rt("history", "list", cwd=str(tmp_path))
+        assert r.returncode == 0
+        entries = json.loads(r.stdout)
+        # Most recent (highest timestamp) first
+        assert entries[0]["run_id"] == run_ids[-1]
+        assert entries[-1]["run_id"] == run_ids[0]
+
+    def test_history_list_last_n(self, tmp_path):
+        self._create_synthetic_history(tmp_path, 5)
+
+        r = run_rt("history", "list", "--last", "2", cwd=str(tmp_path))
+        assert r.returncode == 0
+        entries = json.loads(r.stdout)
+        assert len(entries) == 2
+
+    def test_history_list_empty_when_no_history(self, tmp_path):
+        r = run_rt("history", "list", cwd=str(tmp_path))
+        assert r.returncode == 0
+        entries = json.loads(r.stdout)
+        assert entries == []

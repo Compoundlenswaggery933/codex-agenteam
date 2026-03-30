@@ -116,16 +116,48 @@ For each stage in the ordered stage list:
      python3 <runtime>/agenteam_rt.py dispatch <stage> \
        --task "<task>" --run-id <run_id>
 
-  b. Read the dispatch plan (JSON):
-     - dispatch: list of roles to launch
+  b. Read the dispatch plan (JSON). Two formats:
+
+     **Flat dispatch (isolation: branch or worktree):**
+     - dispatch: list of roles to launch serially
      - blocked: roles waiting for write lock
      - gate: human or auto
 
+     **Grouped dispatch (isolation: none / scoped parallel):**
+     - groups: list of parallel-safe writer groups
+     - read_only: list of read-only roles
+     - gate: human or auto
+
   c. Launch agents:
+
+     **If plan has flat "dispatch" key (serial mode):**
      - For each role in dispatch list:
        - If mode is "read": launch as Codex subagent (can run in parallel
          with other readers)
        - If mode is "write": launch as Codex subagent (serial by default)
+
+     **If plan has "groups" key (scoped parallel mode):**
+     - Capture baseline: BASELINE=$(git rev-parse HEAD)
+     - Launch read_only roles as parallel subagents (alongside any group)
+     - For each group in order:
+       1. Launch all roles in the group as parallel subagents
+          Instruct agents: "Write your changes but do NOT run git add or
+          git commit. The controller handles commits."
+       2. Wait for all agents in the group to complete
+       3. Serialized commit capture (controller does this, NOT agents):
+          For each writing role in the group:
+            - git add <files matching role's write_scope>
+            - git commit -m "[ateam:<role>] <stage>: <summary>" (if staged files exist)
+       4. Check for unclaimed files: git status --porcelain
+          If any remain -> containment violation
+       5. Run scope audit:
+          python3 <runtime>/agenteam_rt.py scope-audit \
+            --run-id <run_id> --stage <stage> --baseline $BASELINE
+       6. If audit fails:
+          - git reset --hard $BASELINE
+          - Log: "Scope containment violation. Falling back to serial."
+          - Re-dispatch entire stage serially (flat dispatch, one at a time)
+          - Break out of group loop
      - The agent file is at the path in the dispatch plan (e.g.,
        .codex/agents/architect.toml)
      - Pass the task description and any outputs from previous stages

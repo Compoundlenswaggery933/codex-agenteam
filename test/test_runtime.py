@@ -1971,3 +1971,418 @@ class TestRecordGate:
         )
         assert r.returncode != 0
         assert "not found" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Writer group partitioning (pure function)
+# ---------------------------------------------------------------------------
+
+
+class TestWriterGroups:
+    """Test partition_writer_groups pure function via dispatch output."""
+
+    @staticmethod
+    def _make_scoped_config(tmp_path, roles_dict, stage_roles):
+        """Create a config with isolation:none and given roles/stage."""
+        config = {
+            "version": "1",
+            "isolation": "none",
+            "roles": roles_dict,
+            "pipeline": {
+                "stages": [{"name": "build", "roles": stage_roles, "gate": "auto"}],
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_three_non_overlapping_writers_one_group(self, tmp_path):
+        """Three writers with disjoint scopes should all land in one group."""
+        self._make_scoped_config(tmp_path, {
+            "alpha": {"can_write": True, "write_scope": ["src/**"]},
+            "beta": {"can_write": True, "write_scope": ["lib/**"]},
+            "gamma": {"can_write": True, "write_scope": ["docs/**"]},
+        }, ["alpha", "beta", "gamma"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "groups" in plan
+        assert len(plan["groups"]) == 1
+        role_names = [e["role"] for e in plan["groups"][0]["roles"]]
+        assert sorted(role_names) == ["alpha", "beta", "gamma"]
+        assert plan["groups"][0]["parallel"] is True
+
+    def test_two_overlapping_writers_two_groups(self, tmp_path):
+        """Two writers sharing a scope pattern should be in separate groups."""
+        self._make_scoped_config(tmp_path, {
+            "alpha": {"can_write": True, "write_scope": ["src/**"]},
+            "beta": {"can_write": True, "write_scope": ["src/**", "lib/**"]},
+        }, ["alpha", "beta"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert len(plan["groups"]) == 2
+        assert plan["groups"][0]["roles"][0]["role"] == "alpha"
+        assert plan["groups"][1]["roles"][0]["role"] == "beta"
+
+    def test_mixed_overlapping_non_overlapping(self, tmp_path):
+        """Mixed: alpha+gamma share no scopes, beta overlaps with alpha."""
+        self._make_scoped_config(tmp_path, {
+            "alpha": {"can_write": True, "write_scope": ["src/**"]},
+            "beta": {"can_write": True, "write_scope": ["src/**"]},
+            "gamma": {"can_write": True, "write_scope": ["docs/**"]},
+        }, ["alpha", "beta", "gamma"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        # alpha + gamma in group 1 (no overlap), beta in group 2
+        assert len(plan["groups"]) == 2
+        g1_roles = sorted(e["role"] for e in plan["groups"][0]["roles"])
+        g2_roles = sorted(e["role"] for e in plan["groups"][1]["roles"])
+        assert g1_roles == ["alpha", "gamma"]
+        assert g2_roles == ["beta"]
+
+    def test_read_only_roles_in_read_only_list(self, tmp_path):
+        """Read-only roles should appear in read_only, not in groups."""
+        self._make_scoped_config(tmp_path, {
+            "writer": {"can_write": True, "write_scope": ["src/**"]},
+            "reader": {"can_write": False, "write_scope": []},
+        }, ["writer", "reader"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["read_only"] == ["reader"]
+        # writer should be in the groups
+        all_group_roles = []
+        for g in plan["groups"]:
+            for e in g["roles"]:
+                all_group_roles.append(e["role"])
+        assert "writer" in all_group_roles
+        assert "reader" not in all_group_roles
+
+    def test_single_writer_one_group(self, tmp_path):
+        """A single writer produces exactly one group."""
+        self._make_scoped_config(tmp_path, {
+            "solo": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["solo"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert len(plan["groups"]) == 1
+        assert plan["groups"][0]["roles"][0]["role"] == "solo"
+
+    def test_no_writers_zero_groups(self, tmp_path):
+        """Stage with only read-only roles produces zero groups."""
+        self._make_scoped_config(tmp_path, {
+            "reader_a": {"can_write": False},
+            "reader_b": {"can_write": False},
+        }, ["reader_a", "reader_b"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["groups"] == []
+        assert sorted(plan["read_only"]) == ["reader_a", "reader_b"]
+
+
+# ---------------------------------------------------------------------------
+# Grouped dispatch output format
+# ---------------------------------------------------------------------------
+
+
+class TestGroupedDispatch:
+    """Test that cmd_dispatch returns correct format based on isolation mode."""
+
+    @staticmethod
+    def _make_config(tmp_path, isolation, roles_dict, stage_roles):
+        config = {
+            "version": "1",
+            "isolation": isolation,
+            "roles": roles_dict,
+            "pipeline": {
+                "stages": [{"name": "build", "roles": stage_roles, "gate": "human"}],
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_isolation_none_non_overlapping_returns_groups(self, tmp_path):
+        """isolation:none with non-overlapping scopes returns groups key."""
+        self._make_config(tmp_path, "none", {
+            "w1": {"can_write": True, "write_scope": ["src/**"]},
+            "w2": {"can_write": True, "write_scope": ["lib/**"]},
+        }, ["w1", "w2"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "groups" in plan
+        assert "dispatch" not in plan
+        assert len(plan["groups"]) == 1
+        assert plan["policy"] == "none"
+        assert plan["gate"] == "human"
+        assert plan["stage"] == "build"
+
+    def test_isolation_none_overlapping_returns_multiple_groups(self, tmp_path):
+        """isolation:none with overlapping scopes returns multiple groups."""
+        self._make_config(tmp_path, "none", {
+            "w1": {"can_write": True, "write_scope": ["src/**"]},
+            "w2": {"can_write": True, "write_scope": ["src/**"]},
+            "w3": {"can_write": True, "write_scope": ["docs/**"]},
+        }, ["w1", "w2", "w3"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "groups" in plan
+        assert len(plan["groups"]) == 2
+
+    def test_isolation_branch_returns_flat_dispatch(self, tmp_path):
+        """isolation:branch returns flat dispatch list, no groups key."""
+        self._make_config(tmp_path, "branch", {
+            "w1": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["w1"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "dispatch" in plan
+        assert "groups" not in plan
+        assert plan["policy"] == "branch"
+
+    def test_isolation_worktree_returns_flat_dispatch(self, tmp_path):
+        """isolation:worktree returns flat dispatch list, no groups key."""
+        self._make_config(tmp_path, "worktree", {
+            "w1": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["w1"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "dispatch" in plan
+        assert "groups" not in plan
+        assert plan["policy"] == "worktree"
+
+    def test_read_only_present_in_grouped_dispatch(self, tmp_path):
+        """Read-only roles appear in read_only list of grouped dispatch."""
+        self._make_config(tmp_path, "none", {
+            "writer": {"can_write": True, "write_scope": ["src/**"]},
+            "auditor": {"can_write": False},
+        }, ["writer", "auditor"])
+
+        r = run_rt("dispatch", "build", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert "auditor" in plan["read_only"]
+        assert len(plan["groups"]) == 1
+
+    def test_group_roles_have_correct_agent_paths(self, tmp_path):
+        """Each role entry in groups has the correct agent path and mode."""
+        self._make_config(tmp_path, "none", {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+            "qa": {"can_write": True, "write_scope": ["tests/**"]},
+        }, ["dev", "qa"])
+
+        r = run_rt("dispatch", "build", "--task", "build it", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        all_entries = []
+        for g in plan["groups"]:
+            all_entries.extend(g["roles"])
+        for entry in all_entries:
+            assert entry["agent"] == f".codex/agents/{entry['role']}.toml"
+            assert entry["mode"] == "write"
+            assert entry["task"] == "build it"
+
+
+# ---------------------------------------------------------------------------
+# Scope audit
+# ---------------------------------------------------------------------------
+
+
+class TestScopeAudit:
+    """Test cmd_scope_audit with real git repos."""
+
+    @staticmethod
+    def _init_git_repo(path):
+        """Initialize a git repo with an initial commit."""
+        subprocess.run(["git", "init"], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+        # Initial commit (empty)
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _get_head(path):
+        """Get HEAD sha."""
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(path), capture_output=True, text=True, check=True,
+        )
+        return r.stdout.strip()
+
+    @staticmethod
+    def _commit_file(path, filepath, content="x"):
+        """Create/write a file and commit it."""
+        fpath = path / filepath
+        fpath.parent.mkdir(parents=True, exist_ok=True)
+        fpath.write_text(content)
+        subprocess.run(["git", "add", str(filepath)], cwd=str(path), capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"add {filepath}"],
+            cwd=str(path), capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _make_audit_config(tmp_path, roles_dict, stage_roles):
+        config = {
+            "version": "1",
+            "isolation": "none",
+            "roles": roles_dict,
+            "pipeline": {
+                "stages": [{"name": "build", "roles": stage_roles, "gate": "auto"}],
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_all_files_in_scope_passed(self, tmp_path):
+        """All changed files within declared scopes -> passed: true."""
+        self._init_git_repo(tmp_path)
+        baseline = self._get_head(tmp_path)
+
+        self._make_audit_config(tmp_path, {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["dev"])
+
+        # Add a file within scope and commit
+        self._commit_file(tmp_path, "src/main.py", "print('hello')")
+
+        r = run_rt(
+            "scope-audit", "--stage", "build",
+            "--baseline", baseline,
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is True
+        assert result["unclaimed_files"] == []
+        assert result["violations"] == []
+        assert "src/**" in result["files_by_scope"]
+
+    def test_file_outside_scope_fails(self, tmp_path):
+        """A changed file outside all scopes -> passed: false."""
+        self._init_git_repo(tmp_path)
+        baseline = self._get_head(tmp_path)
+
+        self._make_audit_config(tmp_path, {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["dev"])
+
+        # Add a file outside scope
+        self._commit_file(tmp_path, "config/settings.yaml", "key: val")
+
+        r = run_rt(
+            "scope-audit", "--stage", "build",
+            "--baseline", baseline,
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is False
+        assert "config/settings.yaml" in result["unclaimed_files"]
+        assert len(result["violations"]) == 1
+        assert result["violations"][0]["file"] == "config/settings.yaml"
+
+    def test_no_changed_files_passed(self, tmp_path):
+        """No changes since baseline -> passed: true."""
+        self._init_git_repo(tmp_path)
+        baseline = self._get_head(tmp_path)
+
+        self._make_audit_config(tmp_path, {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["dev"])
+
+        r = run_rt(
+            "scope-audit", "--stage", "build",
+            "--baseline", baseline,
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is True
+        assert result["unclaimed_files"] == []
+        assert result["files_by_scope"] == {}
+
+    def test_mixed_in_and_out_of_scope_fails(self, tmp_path):
+        """Mix of in-scope and out-of-scope files -> passed: false."""
+        self._init_git_repo(tmp_path)
+        baseline = self._get_head(tmp_path)
+
+        self._make_audit_config(tmp_path, {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+            "qa": {"can_write": True, "write_scope": ["tests/**"]},
+        }, ["dev", "qa"])
+
+        # In-scope files
+        self._commit_file(tmp_path, "src/app.py", "app code")
+        self._commit_file(tmp_path, "tests/test_app.py", "test code")
+        # Out-of-scope file
+        self._commit_file(tmp_path, "README.md", "# Readme")
+
+        r = run_rt(
+            "scope-audit", "--stage", "build",
+            "--baseline", baseline,
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["passed"] is False
+        assert "README.md" in result["unclaimed_files"]
+        # In-scope files should be classified
+        assert "src/app.py" in result["files_by_scope"].get("src/**", [])
+        assert "tests/test_app.py" in result["files_by_scope"].get("tests/**", [])
+
+    def test_baseline_respected(self, tmp_path):
+        """Only changes after the baseline should be audited."""
+        self._init_git_repo(tmp_path)
+
+        self._make_audit_config(tmp_path, {
+            "dev": {"can_write": True, "write_scope": ["src/**"]},
+        }, ["dev"])
+
+        # Commit an out-of-scope file BEFORE baseline
+        self._commit_file(tmp_path, "config/old.yaml", "old config")
+        baseline = self._get_head(tmp_path)
+
+        # Commit an in-scope file AFTER baseline
+        self._commit_file(tmp_path, "src/new.py", "new code")
+
+        r = run_rt(
+            "scope-audit", "--stage", "build",
+            "--baseline", baseline,
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        # Only src/new.py should be checked (after baseline)
+        # config/old.yaml was before baseline, so not included
+        assert result["passed"] is True
+        assert "config/old.yaml" not in result["unclaimed_files"]
+        assert "src/new.py" in result["files_by_scope"].get("src/**", [])

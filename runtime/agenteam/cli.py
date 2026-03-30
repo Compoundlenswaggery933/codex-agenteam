@@ -9,7 +9,7 @@ import yaml
 from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
 from .config import find_config, load_config
-from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show
+from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show, cmd_scope_audit
 from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
 from .standup import cmd_standup
@@ -88,6 +88,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include dispatch_mode=true for deepdive skill",
     )
 
+    # scope-audit
+    p_scope_audit = sub.add_parser("scope-audit", help="Audit changed files against write_scopes")
+    p_scope_audit.add_argument("--run-id", dest="run_id", default=None)
+    p_scope_audit.add_argument("--stage", required=True, help="Stage name")
+    p_scope_audit.add_argument("--baseline", required=True, help="Baseline commit SHA")
+
     # verify-plan
     p_verify_plan = sub.add_parser("verify-plan", help="Get verification plan for a stage")
     p_verify_plan.add_argument("stage", help="Stage name")
@@ -162,6 +168,8 @@ def main() -> None:
         cmd_validate(args, config)
     elif args.command == "dispatch":
         cmd_dispatch(args, config)
+    elif args.command == "scope-audit":
+        cmd_scope_audit(args, config)
     elif args.command == "status":
         cmd_status(args, config)
     elif args.command == "policy":

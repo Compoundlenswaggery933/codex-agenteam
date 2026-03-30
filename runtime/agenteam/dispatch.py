@@ -1,12 +1,86 @@
 """Dispatch planning, policy checks, and role queries."""
 
+import fnmatch
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 from .config import resolve_team_config
 from .roles import resolve_roles
 from .state import get_pipeline_stages
+
+
+# ---------------------------------------------------------------------------
+# Pure helpers
+# ---------------------------------------------------------------------------
+
+
+def _scopes_overlap(scope_a: list[str], scope_b: list[str]) -> bool:
+    """Return True if any pattern in scope_a exactly matches any pattern in scope_b.
+
+    This uses the same string-equality overlap check as cmd_policy_check:
+    two scopes overlap when they share at least one identical pattern string.
+    """
+    return bool(set(scope_a) & set(scope_b))
+
+
+def partition_writer_groups(
+    stage_roles: list[str],
+    resolved_roles: dict[str, dict],
+) -> tuple[list[dict], list[str]]:
+    """Partition a stage's roles into parallel-safe writer groups.
+
+    Returns:
+        (groups, read_only)
+        groups  -- list of dicts: {"group": N, "roles": [...], "parallel": True}
+        read_only -- list of role names with can_write: false
+    """
+    writers: list[str] = []
+    read_only: list[str] = []
+
+    for rname in stage_roles:
+        role = resolved_roles.get(rname, {"name": rname})
+        if role.get("can_write", False):
+            writers.append(rname)
+        else:
+            read_only.append(rname)
+
+    # Sort writers alphabetically for deterministic ordering
+    writers.sort()
+
+    # Greedy partitioning
+    groups: list[list[str]] = []
+    # Track the scopes already present in each group (list of sets-of-patterns)
+    group_scopes: list[set[str]] = []
+
+    for wname in writers:
+        role = resolved_roles.get(wname, {"name": wname})
+        w_scope = set(role.get("write_scope", []))
+
+        placed = False
+        for gi, grp in enumerate(groups):
+            if not (w_scope & group_scopes[gi]):
+                # No overlap with any existing role in this group
+                grp.append(wname)
+                group_scopes[gi] |= w_scope
+                placed = True
+                break
+
+        if not placed:
+            groups.append([wname])
+            group_scopes.append(set(w_scope))
+
+    result = [
+        {"group": i + 1, "roles": grp, "parallel": True}
+        for i, grp in enumerate(groups)
+    ]
+    return result, read_only
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
 
 
 def cmd_dispatch(args, config: dict) -> None:
@@ -28,11 +102,45 @@ def cmd_dispatch(args, config: dict) -> None:
     roles = resolve_roles(config)
     role_names = stage_config.get("roles", [])
     _, isolation_mode = resolve_team_config(config)
+
+    # --- Scoped parallel mode (isolation: none) ---
+    if isolation_mode == "none":
+        writer_groups, read_only_names = partition_writer_groups(role_names, roles)
+
+        # Build grouped dispatch output
+        groups_out = []
+        for wg in writer_groups:
+            role_entries = []
+            for rname in wg["roles"]:
+                role_entries.append({
+                    "role": rname,
+                    "agent": f".codex/agents/{rname}.toml",
+                    "mode": "write",
+                    "task": task,
+                })
+            groups_out.append({
+                "group": wg["group"],
+                "roles": role_entries,
+                "parallel": True,
+            })
+
+        plan = {
+            "stage": stage_name,
+            "groups": groups_out,
+            "read_only": read_only_names,
+            "policy": isolation_mode,
+            "gate": stage_config.get("gate", "auto"),
+            "blocked": [],
+        }
+        print(json.dumps(plan))
+        return
+
+    # --- Flat dispatch (branch / worktree) ---
     # Map isolation to write_mode for dispatch logic
     write_mode = (
         "serial"
         if isolation_mode == "branch"
-        else ("worktree" if isolation_mode == "worktree" else "scoped")
+        else "worktree"
     )
 
     # Load current state for write locks
@@ -84,6 +192,86 @@ def cmd_dispatch(args, config: dict) -> None:
     }
 
     print(json.dumps(plan))
+
+
+def cmd_scope_audit(args, config: dict) -> None:
+    """Audit that all changed files since baseline are within declared write_scopes."""
+    stage_name = args.stage
+    baseline = args.baseline
+
+    stages = get_pipeline_stages(config)
+    stage_config = None
+    for s in stages:
+        if s["name"] == stage_name:
+            stage_config = s
+            break
+
+    if not stage_config:
+        print(json.dumps({"error": f"Stage '{stage_name}' not found in pipeline"}), file=sys.stderr)
+        sys.exit(1)
+
+    roles = resolve_roles(config)
+    role_names = stage_config.get("roles", [])
+
+    # Collect all write_scope patterns from writing roles in this stage
+    all_scopes: list[str] = []
+    for rname in role_names:
+        role = roles.get(rname, {"name": rname})
+        if role.get("can_write", False):
+            all_scopes.extend(role.get("write_scope", []))
+
+    # De-duplicate while preserving order for deterministic output
+    seen: set[str] = set()
+    unique_scopes: list[str] = []
+    for s in all_scopes:
+        if s not in seen:
+            seen.add(s)
+            unique_scopes.append(s)
+
+    # Get changed files via git diff
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", f"{baseline}..HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        changed_files = [f for f in proc.stdout.strip().split("\n") if f]
+    except subprocess.CalledProcessError as e:
+        print(
+            json.dumps({"error": f"git diff failed: {e.stderr.strip()}"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Classify each changed file
+    files_by_scope: dict[str, list[str]] = {}
+    unclaimed_files: list[str] = []
+
+    for fpath in changed_files:
+        claimed = False
+        for scope in unique_scopes:
+            if fnmatch.fnmatch(fpath, scope):
+                files_by_scope.setdefault(scope, []).append(fpath)
+                claimed = True
+                break  # first matching scope wins
+        if not claimed:
+            unclaimed_files.append(fpath)
+
+    violations = [
+        {"file": f, "reason": "outside all declared write_scopes for this stage"}
+        for f in unclaimed_files
+    ]
+
+    result = {
+        "stage": stage_name,
+        "baseline": baseline,
+        "passed": len(unclaimed_files) == 0,
+        "files_by_scope": files_by_scope,
+        "unclaimed_files": unclaimed_files,
+        "violations": violations,
+    }
+    print(json.dumps(result))
 
 
 def cmd_policy_check(args, config: dict) -> None:

@@ -19,6 +19,8 @@ def generate_run_id() -> str:
 def get_pipeline_stages(config: dict) -> list[dict]:
     """Extract pipeline stages from config."""
     pipeline = config.get("pipeline", {})
+    if not isinstance(pipeline, dict):
+        return []
     stages: list[dict] = pipeline.get("stages", [])
     return stages
 

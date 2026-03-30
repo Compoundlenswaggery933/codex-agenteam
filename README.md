@@ -188,7 +188,35 @@ Writing agents are automatically isolated on dedicated branches — they never t
 
 ### HOTL Integration
 
-AgenTeam auto-detects the [HOTL plugin](https://github.com/yimwoo/hotl). When present, AgenTeam is the outer orchestrator (who does what, write policy) and HOTL is the inner engine (loops, verification, gates). Force it explicitly with `pipeline: hotl`.
+AgenTeam auto-detects the [HOTL plugin](https://github.com/yimwoo/hotl). When present, roles can optionally use HOTL execution skills for stronger development discipline:
+
+| HOTL Skill | Used by | When |
+|------------|---------|------|
+| `tdd` | Dev | Implementation stages — TDD workflow |
+| `systematic-debugging` | Dev | On verify failure or rework |
+| `code-review` | Reviewer | Review stages — structured review |
+
+Enable per role in config:
+
+```yaml
+roles:
+  dev:
+    hotl_skills: [tdd, systematic-debugging]
+  reviewer:
+    hotl_skills: [code-review]
+```
+
+Without HOTL installed, roles use their default behavior — no degradation, just less ceremony.
+
+### Resume
+
+Interrupted runs are detected automatically at session start. Resume with verify-first strategy:
+
+```
+@ATeam resume <run-id>
+```
+
+The runtime re-verifies the last incomplete stage before continuing, and asks before re-dispatching expensive work.
 
 ---
 
@@ -200,6 +228,7 @@ For Codex CLI users:
 |---------|---------|
 | `$ateam:init` | Set up team config and generate agents |
 | `$ateam:run "task"` | Run the full pipeline on a task |
+| `$ateam:resume` | Resume an interrupted run |
 | `$ateam:status` | Show team status and current config |
 | `$ateam:add-member` | Add a custom team member |
 | `$ateam:generate` | Regenerate agents after config changes |

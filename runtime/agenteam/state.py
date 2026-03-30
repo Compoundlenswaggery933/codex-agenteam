@@ -1,12 +1,14 @@
 """Run state management: init, status, state file I/O."""
 
+import hashlib
 import json
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from .config import resolve_team_config
+from .config import find_config, resolve_team_config
+from .events import append_event
 
 
 def generate_run_id() -> str:
@@ -62,12 +64,24 @@ def cmd_init(args, config: dict) -> None:
     pipeline_mode = pipeline_mode or "standalone"
     stages = get_pipeline_stages(config)
 
+    # Compute config hash for resume drift detection
+    config_hash = ""
+    try:
+        config_path = find_config(args.config if hasattr(args, "config") and args.config else None)
+        config_hash = hashlib.sha256(Path(config_path).read_bytes()).hexdigest()
+    except (FileNotFoundError, OSError):
+        pass
+
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
     state: dict = {
         "run_id": run_id,
         "task": task,
         "pipeline_mode": pipeline_mode,
         "current_stage": stages[0]["name"] if stages else None,
-        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "started_at": now,
+        "last_update": now,
+        "config_hash": config_hash,
         "status": "running",
         "branch": None,
         "stages": {},
@@ -88,6 +102,9 @@ def cmd_init(args, config: dict) -> None:
     state_path = state_dir / f"{run_id}.json"
     with open(state_path, "w") as f:
         json.dump(state, f, indent=2)
+
+    # Emit run_started event
+    append_event(run_id, "run_started", None, {"task": task, "pipeline_mode": pipeline_mode})
 
     print(json.dumps(state))
 

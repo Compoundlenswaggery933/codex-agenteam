@@ -3095,3 +3095,572 @@ class TestGateEval:
         assert stage["criteria_failed"] == ["max_files_changed"]
         assert stage["criteria_details"]["max_files_changed"]["configured"] == 15
         assert stage["override_reason"] == "Bulk rename across 23 files"
+
+
+# ---------------------------------------------------------------------------
+# Event log
+# ---------------------------------------------------------------------------
+
+
+class TestEventLog:
+    def test_event_append_creates_jsonl(self, tmp_path):
+        r = run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "run_started",
+            "--data", '{"task": "test task", "pipeline_mode": "standalone"}',
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["type"] == "run_started"
+        assert result["run_id"] == "test-run"
+        assert result["stage"] is None
+        assert result["data"]["task"] == "test task"
+
+        # Verify JSONL file exists
+        jsonl = tmp_path / ".agenteam" / "events" / "test-run.jsonl"
+        assert jsonl.exists()
+        lines = jsonl.read_text().strip().split("\n")
+        assert len(lines) == 1
+        event = json.loads(lines[0])
+        assert event["type"] == "run_started"
+
+    def test_event_append_validates_type(self, tmp_path):
+        r = run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "invalid_type",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "Unknown event type" in r.stderr
+
+    def test_event_append_validates_required_data(self, tmp_path):
+        r = run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "run_started",
+            "--data", '{"task": "test"}',
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "pipeline_mode" in r.stderr
+
+    def test_event_list_returns_events(self, tmp_path):
+        for i in range(3):
+            run_rt(
+                "event", "append",
+                "--run-id", "test-run",
+                "--type", "run_started",
+                "--data", json.dumps({"task": f"task-{i}", "pipeline_mode": "standalone"}),
+                cwd=str(tmp_path),
+            )
+        r = run_rt("event", "list", "--run-id", "test-run", cwd=str(tmp_path))
+        assert r.returncode == 0
+        events = json.loads(r.stdout)
+        assert len(events) == 3
+
+    def test_event_list_filters_by_type(self, tmp_path):
+        run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "run_started",
+            "--data", '{"task": "t", "pipeline_mode": "standalone"}',
+            cwd=str(tmp_path),
+        )
+        run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "stage_dispatched",
+            "--stage", "implement",
+            "--data", '{"roles": ["dev"], "isolation": "branch"}',
+            cwd=str(tmp_path),
+        )
+        r = run_rt(
+            "event", "list",
+            "--run-id", "test-run",
+            "--type", "run_started",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        events = json.loads(r.stdout)
+        assert len(events) == 1
+        assert events[0]["type"] == "run_started"
+
+    def test_event_list_filters_by_stage(self, tmp_path):
+        run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "stage_dispatched",
+            "--stage", "implement",
+            "--data", '{"roles": ["dev"], "isolation": "branch"}',
+            cwd=str(tmp_path),
+        )
+        run_rt(
+            "event", "append",
+            "--run-id", "test-run",
+            "--type", "stage_dispatched",
+            "--stage", "review",
+            "--data", '{"roles": ["reviewer"], "isolation": "branch"}',
+            cwd=str(tmp_path),
+        )
+        r = run_rt(
+            "event", "list",
+            "--run-id", "test-run",
+            "--stage", "implement",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        events = json.loads(r.stdout)
+        assert len(events) == 1
+        assert events[0]["stage"] == "implement"
+
+    def test_event_list_last_n(self, tmp_path):
+        for i in range(5):
+            run_rt(
+                "event", "append",
+                "--run-id", "test-run",
+                "--type", "run_started",
+                "--data", json.dumps({"task": f"task-{i}", "pipeline_mode": "standalone"}),
+                cwd=str(tmp_path),
+            )
+        r = run_rt(
+            "event", "list",
+            "--run-id", "test-run",
+            "--last", "2",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        events = json.loads(r.stdout)
+        assert len(events) == 2
+        assert events[0]["data"]["task"] == "task-3"
+        assert events[1]["data"]["task"] == "task-4"
+
+    def test_event_list_empty_for_missing_file(self, tmp_path):
+        r = run_rt(
+            "event", "list",
+            "--run-id", "nonexistent",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        events = json.loads(r.stdout)
+        assert events == []
+
+
+# ---------------------------------------------------------------------------
+# State machine transitions
+# ---------------------------------------------------------------------------
+
+
+class TestTransitions:
+    def _init_run(self, tmp_path):
+        """Helper: init a run and return the run_id."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_valid_transition_pending_to_dispatched(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt(
+            "transition",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--to", "dispatched",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["stage"] == "implement"
+        assert result["from"] == "pending"
+        assert result["to"] == "dispatched"
+        assert "last_update" in result
+
+    def test_invalid_transition_rejected(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt(
+            "transition",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--to", "completed",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "Invalid transition" in r.stderr
+
+    def test_transition_updates_last_update(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            old_state = json.load(f)
+        old_update = old_state.get("last_update")
+
+        import time
+        time.sleep(0.01)
+
+        r = run_rt(
+            "transition",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--to", "dispatched",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        with open(state_path) as f:
+            new_state = json.load(f)
+        assert new_state["last_update"] >= old_update
+
+    def test_v22_backward_compat(self, tmp_path):
+        """v2.2 'in-progress' should be mapped to 'dispatched' for transition purposes."""
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+
+        # Manually set stage status to v2.2 'in-progress'
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["implement"]["status"] = "in-progress"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        # Should be able to transition to 'verifying' (valid from 'dispatched')
+        r = run_rt(
+            "transition",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--to", "verifying",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["from"] == "in-progress"
+        assert result["to"] == "verifying"
+
+    def test_transition_missing_stage(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt(
+            "transition",
+            "--run-id", run_id,
+            "--stage", "nonexistent",
+            "--to", "dispatched",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+    def test_dispatched_to_verifying(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_verifying_to_passed(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "passed", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_verifying_to_failed(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "failed", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_failed_to_dispatched(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "failed", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_passed_to_gated(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "passed", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "gated", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_gated_to_completed(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "passed", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "gated", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "completed", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_gated_to_rejected(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "verifying", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "passed", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "gated", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "rejected", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_completed_is_terminal(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        # Fast-track: pending -> dispatched -> completed (no verify, no gate)
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "completed", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "Invalid transition" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Resume
+# ---------------------------------------------------------------------------
+
+
+class TestResume:
+    def _init_run(self, tmp_path):
+        """Helper: init a run and return the run_id."""
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "resume test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def _make_stale(self, tmp_path, run_id, minutes_ago=15):
+        """Set last_update to N minutes ago."""
+        from datetime import datetime, timedelta, timezone
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        past = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        state["last_update"] = past.strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+    def test_resume_detect_finds_stale_run(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        self._make_stale(tmp_path, run_id, 15)
+        r = run_rt("resume-detect", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["resumable_runs"]) == 1
+        assert result["resumable_runs"][0]["run_id"] == run_id
+
+    def test_resume_detect_ignores_fresh_run(self, tmp_path):
+        self._init_run(tmp_path)
+        r = run_rt("resume-detect", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["resumable_runs"]) == 0
+
+    def test_resume_detect_ignores_completed(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["status"] = "completed"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+        self._make_stale(tmp_path, run_id, 15)
+        r = run_rt("resume-detect", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["resumable_runs"]) == 0
+
+    def test_resume_plan_returns_structure(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        self._make_stale(tmp_path, run_id, 15)
+        r = run_rt("resume-plan", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["run_id"] == run_id
+        assert result["stale"] is True
+        assert "interrupted_stage" in result
+        assert "completed_stages" in result
+        assert "remaining_stages" in result
+        assert result["interrupted_stage"]["name"] == "research"
+
+    def test_resume_plan_config_hash_match(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        self._make_stale(tmp_path, run_id, 15)
+        r = run_rt("resume-plan", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["config_hash_match"] is True
+
+    def test_resume_plan_config_hash_mismatch(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        self._make_stale(tmp_path, run_id, 15)
+        # Modify config after init
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "a") as f:
+            f.write("\n# modified\n")
+        r = run_rt("resume-plan", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["config_hash_match"] is False
+
+    def test_resume_plan_verify_safe_from_config(self, tmp_path):
+        import yaml
+        make_config(tmp_path)
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        # Add verify_safe to research stage
+        for stage in config["pipeline"]["stages"]:
+            if stage["name"] == "research":
+                stage["verify"] = "echo ok"
+                stage["verify_safe"] = True
+                break
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        run_id = json.loads(r.stdout)["run_id"]
+        self._make_stale(tmp_path, run_id, 15)
+
+        r = run_rt("resume-plan", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["interrupted_stage"]["verify_safe"] is True
+        assert result["interrupted_stage"]["verify_safe_source"] == "config"
+
+
+# ---------------------------------------------------------------------------
+# HOTL adapter
+# ---------------------------------------------------------------------------
+
+
+class TestHotlAdapter:
+    def _init_run_with_hotl_skills(self, tmp_path, role_overrides=None):
+        """Helper: create config with hotl_skills and init a run."""
+        overrides = {"roles": role_overrides} if role_overrides else {}
+        make_config(tmp_path, overrides)
+        r = run_rt("init", "--task", "adapter test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_hotl_skills_no_hotl_installed(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(
+            tmp_path,
+            {"dev": {"hotl_skills": ["tdd"]}},
+        )
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--role", "dev",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["hotl_available"] is False
+        # Eligibility still resolves even without HOTL
+        assert len(result["eligible"]) == 1
+        assert result["eligible"][0]["skill"] == "tdd"
+
+    def test_hotl_skills_tdd_eligible(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(
+            tmp_path,
+            {"dev": {"hotl_skills": ["tdd", "systematic-debugging"]}},
+        )
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--role", "dev",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        eligible_skills = [e["skill"] for e in result["eligible"]]
+        assert "tdd" in eligible_skills
+        not_eligible_skills = [e["skill"] for e in result["not_eligible"]]
+        assert "systematic-debugging" in not_eligible_skills
+
+    def test_hotl_skills_tdd_not_eligible_wrong_stage(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(
+            tmp_path,
+            {"dev": {"hotl_skills": ["tdd"]}},
+        )
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "review",
+            "--role", "dev",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["eligible"]) == 0
+        assert len(result["not_eligible"]) == 1
+        assert result["not_eligible"][0]["skill"] == "tdd"
+
+    def test_hotl_skills_code_review_eligible(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(
+            tmp_path,
+            {"reviewer": {"hotl_skills": ["code-review"]}},
+        )
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "review",
+            "--role", "reviewer",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["eligible"]) == 1
+        assert result["eligible"][0]["skill"] == "code-review"
+        assert result["eligible"][0]["hotl_skill"] == "hotl:code-review"
+
+    def test_hotl_skills_systematic_debugging_eligible_on_failed(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(
+            tmp_path,
+            {"dev": {"hotl_skills": ["systematic-debugging"]}},
+        )
+        # Manually set implement stage to failed
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["implement"]["status"] = "failed"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--role", "dev",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert len(result["eligible"]) == 1
+        assert result["eligible"][0]["skill"] == "systematic-debugging"
+
+    def test_hotl_skills_no_configured_skills(self, tmp_path):
+        run_id = self._init_run_with_hotl_skills(tmp_path)
+        env = make_home_env(tmp_path)
+        r = run_rt(
+            "hotl-skills",
+            "--run-id", run_id,
+            "--stage", "implement",
+            "--role", "dev",
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["configured_skills"] == []
+        assert result["eligible"] == []

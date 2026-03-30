@@ -87,3 +87,4 @@ But still handle the request if they ask through @ATeam.
 - Individual roles are Codex agents -- users `@` them directly for focused tasks.
 - `@ATeam` handles team-level operations: pipeline, status, adding roles.
 - On first use, show the team roster so users know who they can `@`.
+- **CRITICAL: Writing roles (@Dev, @Qa, custom writers) MUST work on isolated branches, never on the user's current branch.** The assign and run skills handle this via `git-isolate.sh`. If you are routing to a writing role, always go through `$ateam:assign` or `$ateam:run` -- never launch a writing agent directly.

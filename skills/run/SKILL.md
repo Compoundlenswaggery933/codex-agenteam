@@ -50,6 +50,43 @@ If the project config defines pipeline profiles, select one before init:
    python3 <runtime>/agenteam_rt.py init --task "<task>" --profile <name>
    ```
 
+### 2b2. Inject Run History
+
+Before starting the pipeline, check for relevant context from past runs:
+
+1. Call `python3 <runtime>/agenteam_rt.py history list --last 10`
+2. If the result is empty (no past runs), skip this step.
+3. Filter for relevance using LLM judgment:
+   - Prefer runs with similar task descriptions
+   - Prefer runs that touched similar artifact paths or stages
+   - Prefer runs with lessons (verify failures, rework edges) — these
+     are more informative than clean runs
+   - Prefer recent runs over older ones
+4. Select 0-3 most relevant summaries. If nothing is clearly relevant,
+   inject nothing — nothing is better than noisy context.
+5. Format as "Prior Run Context" and append to the task description
+   for the first stage's dispatch:
+
+```
+## Prior Run Context
+
+### Run: "add user authentication" (2026-03-30, standard profile)
+- Status: completed (5/5 stages)
+- Implement stage needed 3 verify attempts (test failures in auth middleware)
+- Cross-stage rework: test → implement (auth session handling)
+- Final verification: passed
+
+### Run: "fix login redirect bug" (2026-03-29, quick profile)
+- Status: completed (2/2 stages)
+- Clean run, no rework
+```
+
+**Rules:**
+- Conservative: inject 0-3 summaries, never more
+- Selective: nothing is better than noisy/irrelevant context
+- Non-blocking: if `history list` fails, skip silently and continue
+- No accumulation: each run gets fresh context, not a growing blob
+
 ### 2c. Collaborative Discovery Mode
 
 If multiple discovery-phase stages can run in parallel, switch to
@@ -662,12 +699,22 @@ Only after the final configured stage completes:
 - Show a summary of what each role produced
 - Show the final state: `python3 <runtime>/agenteam_rt.py status`
 - Suggest next steps (commit, create PR, etc.)
+- Persist run history for future context:
+  ```bash
+  python3 <runtime>/agenteam_rt.py history append --run-id <run_id>
+  ```
+  This saves the run summary + lessons learned for injection into future
+  runs. Only called on completed or failed runs — not stopped/abandoned.
 
 On unrecoverable pipeline failure:
 - Emit run_finished event:
   ```bash
   python3 <runtime>/agenteam_rt.py event append --run-id <run_id> \
     --type run_finished --data '{"status": "failed"}'
+  ```
+- Persist run history (failures have useful lessons too):
+  ```bash
+  python3 <runtime>/agenteam_rt.py history append --run-id <run_id>
   ```
 
 ## Error Handling

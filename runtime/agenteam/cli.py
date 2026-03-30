@@ -22,7 +22,7 @@ from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
 from .hotl_adapter import cmd_hotl_skills
 from .migrate import cmd_migrate
-from .report import cmd_run_report
+from .report import cmd_history_append, cmd_history_list, cmd_run_report
 from .resume import cmd_resume_detect, cmd_resume_plan
 from .standup import cmd_standup
 from .state import cmd_init, cmd_stage_baseline, cmd_status, validate_run_id
@@ -208,6 +208,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_event_list.add_argument("--stage", default=None)
     p_event_list.add_argument("--last", type=int, default=None)
 
+    # history
+    p_history = sub.add_parser("history", help="Run history commands")
+    p_history_sub = p_history.add_subparsers(dest="history_cmd")
+    p_history_append = p_history_sub.add_parser("append", help="Persist run summary + lessons")
+    p_history_append.add_argument("--run-id", dest="run_id", required=True)
+    p_history_list = p_history_sub.add_parser("list", help="List recent history entries")
+    p_history_list.add_argument("--last", type=int, default=10)
+
     return parser
 
 
@@ -239,6 +247,16 @@ def main() -> None:
             cmd_event_list(args)
         else:
             print(json.dumps({"error": "Unknown event subcommand"}), file=sys.stderr)
+            sys.exit(1)
+        return
+
+    if args.command == "history":
+        if args.history_cmd == "append":
+            cmd_history_append(args)
+        elif args.history_cmd == "list":
+            cmd_history_list(args)
+        else:
+            print(json.dumps({"error": "Unknown history subcommand"}), file=sys.stderr)
             sys.exit(1)
         return
 

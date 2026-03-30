@@ -56,7 +56,7 @@ Use `@ATeam` for team-level operations:
 
 ```
 @ATeam refactor this codebase to be more maintainable
-@ATeam show team status
+@ATeam deepdive
 @ATeam add a security auditor that focuses on OWASP top 10
 ```
 

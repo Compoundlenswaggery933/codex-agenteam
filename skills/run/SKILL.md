@@ -19,6 +19,7 @@ Check for `.agenteam/config.yaml` (or legacy `agenteam.yaml`) in the project roo
 - Set the team name to the project directory name
 - Generate agents: `python3 <runtime>/agenteam_rt.py generate`
 - Tell the user: "AgenTeam auto-initialized with default roles. Edit `.agenteam/config.yaml` to customize."
+- Then continue with the requested run in the same turn. Auto-init is a prerequisite, not the end of the workflow.
 
 ### 2. Accept Task
 
@@ -82,6 +83,11 @@ branch naming. Capture the run state from that output.)
 
 Capture the run state (run_id, pipeline_mode, stages).
 
+Creating the run state is bookkeeping only. Do not stop after printing
+the run ID or stage list. Once you have the run state, continue
+immediately into stage dispatch unless blocked by a human gate, an error,
+or an explicit user stop request.
+
 ### 5. Determine Pipeline Mode
 
 Read `pipeline_mode` from the run state:
@@ -96,10 +102,15 @@ Read `pipeline_mode` from the run state:
 
 ### 6. Standalone Pipeline
 
-Iterate through each stage in order:
+Iterate through each stage from the run state's `stages` in order. Do not
+hardcode a shortened list. The default standalone pipeline is:
+
+`research -> strategy -> design -> plan -> implement -> test -> review`
+
+If the project config defines a different stage list, follow the config.
 
 ```
-For each stage in [design, plan, implement, test, review]:
+For each stage in the ordered stage list:
 
   a. Get dispatch plan:
      python3 <runtime>/agenteam_rt.py dispatch <stage> \
@@ -119,6 +130,8 @@ For each stage in [design, plan, implement, test, review]:
        .codex/agents/architect.toml)
      - Pass the task description and any outputs from previous stages
        as context to the agent
+     - You must launch actual Codex subagents. Do not keep the work in the
+       lead agent and do not simulate what a role "would" say.
 
   d. Collect outputs:
      - Gather each role's output
@@ -136,6 +149,10 @@ For each stage in [design, plan, implement, test, review]:
      - Implement output feeds into test stage
      - All outputs feed into review stage
 ```
+
+Do not mark the run complete after `implement`. Unless the user explicitly
+asks to stop early, continue through `test` and `review`, and surface the
+reviewer's findings before calling the pipeline done.
 
 ### 7. HOTL Wrapper Pipeline
 
@@ -176,7 +193,7 @@ never modifies HOTL internals.
 
 ### 8. Completion
 
-After all stages complete:
+Only after the final configured stage completes:
 - Show a summary of what each role produced
 - Show the final state: `python3 <runtime>/agenteam_rt.py status`
 - Suggest next steps (commit, create PR, etc.)

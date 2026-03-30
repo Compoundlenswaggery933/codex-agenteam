@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import resolve_team_config
+from .events import append_event
 from .roles import resolve_roles
 from .state import get_pipeline_stages
 
@@ -258,6 +259,23 @@ def cmd_record_verify(args, config: dict) -> None:
 
     _save_state(run_id, state)
 
+    # Emit stage_verified event
+    # Resolve verify command from config stages
+    stages = get_pipeline_stages(config)
+    verify_cmd = ""
+    for s in stages:
+        if s["name"] == stage_name:
+            verify_cmd = s.get("verify", "")
+            break
+    event_data: dict = {
+        "result": result_val,
+        "command": verify_cmd,
+        "attempt": attempt_num,
+    }
+    if rework_stage:
+        event_data["rework_stage"] = rework_stage
+    append_event(run_id, "stage_verified", stage_name, event_data)
+
     print(json.dumps({"recorded": True, "stage": stage_name, "attempt": attempt_num, "result": result_val}))
 
 
@@ -360,6 +378,9 @@ def cmd_record_gate(args, config: dict) -> None:
             stage_state["override_reason"] = override_reason
 
     _save_state(run_id, state)
+
+    # Emit stage_gated event
+    append_event(run_id, "stage_gated", stage_name, {"gate_type": gate_type, "result": result_val})
 
     response: dict = {
         "recorded": True,

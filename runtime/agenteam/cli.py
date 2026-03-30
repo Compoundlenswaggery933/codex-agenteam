@@ -10,10 +10,14 @@ from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
 from .config import find_config, load_config
 from .dispatch import cmd_dispatch, cmd_policy_check, cmd_roles_list, cmd_roles_show, cmd_scope_audit
+from .events import cmd_event_append, cmd_event_list
 from .gates import cmd_gate_eval
+from .transitions import cmd_transition
 from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
+from .hotl_adapter import cmd_hotl_skills
 from .report import cmd_run_report
+from .resume import cmd_resume_detect, cmd_resume_plan
 from .standup import cmd_standup
 from .state import cmd_init, cmd_stage_baseline, cmd_status
 from .validate import cmd_validate
@@ -141,6 +145,39 @@ def build_parser() -> argparse.ArgumentParser:
     p_gate_eval.add_argument("--run-id", dest="run_id", required=True)
     p_gate_eval.add_argument("--stage", required=True)
 
+    # hotl-skills
+    p_hotl_skills = sub.add_parser("hotl-skills", help="Resolve HOTL skill eligibility")
+    p_hotl_skills.add_argument("--run-id", dest="run_id", required=True)
+    p_hotl_skills.add_argument("--stage", required=True)
+    p_hotl_skills.add_argument("--role", required=True)
+
+    # resume-detect
+    sub.add_parser("resume-detect", help="Scan for stale resumable runs")
+
+    # resume-plan
+    p_resume_plan = sub.add_parser("resume-plan", help="Build structured resume plan")
+    p_resume_plan.add_argument("--run-id", dest="run_id", required=True)
+
+    # transition
+    p_transition = sub.add_parser("transition", help="Validate and apply a stage status transition")
+    p_transition.add_argument("--run-id", dest="run_id", required=True)
+    p_transition.add_argument("--stage", required=True)
+    p_transition.add_argument("--to", required=True)
+
+    # event
+    p_event = sub.add_parser("event", help="Event log commands")
+    p_event_sub = p_event.add_subparsers(dest="event_cmd")
+    p_event_append = p_event_sub.add_parser("append", help="Append an event")
+    p_event_append.add_argument("--run-id", dest="run_id", required=True)
+    p_event_append.add_argument("--type", required=True)
+    p_event_append.add_argument("--stage", default=None)
+    p_event_append.add_argument("--data", default="{}")
+    p_event_list = p_event_sub.add_parser("list", help="List events")
+    p_event_list.add_argument("--run-id", dest="run_id", required=True)
+    p_event_list.add_argument("--type", default=None)
+    p_event_list.add_argument("--stage", default=None)
+    p_event_list.add_argument("--last", type=int, default=None)
+
     return parser
 
 
@@ -158,6 +195,20 @@ def main() -> None:
             cmd_hotl_check(args)
         else:
             print(json.dumps({"error": "Unknown hotl subcommand"}), file=sys.stderr)
+            sys.exit(1)
+        return
+
+    if args.command == "resume-detect":
+        cmd_resume_detect(args)
+        return
+
+    if args.command == "event":
+        if args.event_cmd == "append":
+            cmd_event_append(args)
+        elif args.event_cmd == "list":
+            cmd_event_list(args)
+        else:
+            print(json.dumps({"error": "Unknown event subcommand"}), file=sys.stderr)
             sys.exit(1)
         return
 
@@ -223,6 +274,12 @@ def main() -> None:
         cmd_run_report(args, config)
     elif args.command == "gate-eval":
         cmd_gate_eval(args, config)
+    elif args.command == "transition":
+        cmd_transition(args, config)
+    elif args.command == "resume-plan":
+        cmd_resume_plan(args, config)
+    elif args.command == "hotl-skills":
+        cmd_hotl_skills(args, config)
     else:
         parser.print_help()
         sys.exit(1)

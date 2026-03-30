@@ -108,7 +108,7 @@ b. PLAN STAGE:
    - Gate: human approval of the plan
 
 c. IMPLEMENT + TEST STAGE:
-   - Resolve roles: agenteam-rt dispatch implement -> {implementer}
+   - Resolve roles: agenteam-rt dispatch implement -> {dev}
    - Resolve roles: agenteam-rt dispatch test -> {qa}
    - Invoke HOTL loop-execution or subagent-execution
    - HOTL executes workflow steps

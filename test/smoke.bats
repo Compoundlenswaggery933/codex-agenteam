@@ -75,8 +75,8 @@ print('OK')
   [ "$status" -eq 0 ]
 }
 
-@test "implementer.yaml exists and is valid YAML" {
-  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/implementer.yaml'))"
+@test "dev.yaml exists and is valid YAML" {
+  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/dev.yaml'))"
   [ "$status" -eq 0 ]
 }
 

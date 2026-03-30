@@ -51,7 +51,7 @@ Ask the user (one question at a time):
    - `hotl` — Integrate with HOTL plugin for structured workflows
    - `dispatch-only` — No pipeline, dispatch roles ad-hoc
 3. **Write scope customization:** "Do the default write scopes work?
-   (implementer: src/**, lib/** | qa: tests/**, *.test.*)"
+   (dev: src/**, lib/** | qa: tests/**, *.test.*)"
 4. **Custom roles:** "Do you want to add any custom roles? (e.g., security_auditor, docs_writer)"
 
 Update `agenteam.yaml` with the user's choices.

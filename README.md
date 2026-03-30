@@ -1,6 +1,6 @@
 # AgenTeam -- Specialist AI Agents as Your Team for Codex
 
-**AgenTeam** is a [Codex](https://codex.ai) plugin that turns a single AI session into a team of specialists. Define roles like architect, implementer, qa, and reviewer -- then orchestrate them through a configurable pipeline. Each role becomes a Codex-native custom agent (`.codex/agents/*.toml`) with its own model, permissions, and write scope.
+**AgenTeam** is a [Codex](https://codex.ai) plugin that turns a single AI session into a team of specialists. Define roles like architect, dev, qa, and reviewer -- then orchestrate them through a configurable pipeline. Each role becomes a Codex-native custom agent (`.codex/agents/*.toml`) with its own model, permissions, and write scope.
 
 > Design. Plan. Implement. Test. Review. -- All in one session.
 
@@ -176,7 +176,7 @@ AgenTeam infers the role config, confirms with you, writes to `agenteam.yaml`, a
 | **researcher** | research, design | `docs/research/` | Inherits user default | Investigate web, GitHub, docs, community |
 | **pm** | strategy, design | `docs/strategies/` | Inherits user default | Decide what to build, prioritize, write specs |
 | **architect** | design, review | `docs/designs/` | Inherits user default | Design systems, critique plans, identify risks |
-| **implementer** | plan, implement | `docs/plans/`, `src/**`, `lib/**` | gpt-5.3-codex | Translate designs into plans, then write code |
+| **dev** | plan, implement | `docs/plans/`, `src/**`, `lib/**` | gpt-5.3-codex | Translate designs into plans, then write code |
 | **qa** | test | `tests/**`, `*.test.*` | gpt-5.3-codex | Write unit and integration tests |
 | **reviewer** | review | Read-only | Inherits user default | Review for correctness, security, and regressions |
 
@@ -199,7 +199,7 @@ team:
 
 roles:
   # Analysis/review roles inherit the user's default Codex model
-  implementer:
+  dev:
     model: gpt-5.3-codex
     write_scope:
       - "src/**"
@@ -227,10 +227,10 @@ pipeline:
       roles: [architect, pm, researcher]
       gate: human
     - name: plan
-      roles: [implementer]
+      roles: [dev]
       gate: human
     - name: implement
-      roles: [implementer]
+      roles: [dev]
       gate: auto
     - name: test
       roles: [qa]

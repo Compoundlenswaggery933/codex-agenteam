@@ -12,7 +12,7 @@ team:
 # Uncomment and modify to customize built-in roles
 roles:
   # Analysis/review roles inherit the user's default Codex model unless overridden.
-  implementer:
+  dev:
     model: gpt-5.3-codex
     can_write: true
     write_scope:
@@ -71,12 +71,12 @@ pipeline:
 
     - name: plan
       roles:
-        - implementer
+        - dev
       gate: human
 
     - name: implement
       roles:
-        - implementer
+        - dev
       gate: auto
 
     - name: test

@@ -37,7 +37,7 @@ Show what was generated:
 ```
 Generated agents:
   .codex/agents/architect.toml      (updated)
-  .codex/agents/implementer.toml    (updated)
+  .codex/agents/dev.toml    (updated)
   .codex/agents/reviewer.toml       (updated)
   .codex/agents/qa.toml    (updated)
 ```

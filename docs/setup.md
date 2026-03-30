@@ -80,7 +80,7 @@ team:
 
 roles:
   # Analysis/review roles inherit the user's default Codex model.
-  implementer:
+  dev:
     model: gpt-5.3-codex
     can_write: true
     write_scope:
@@ -106,7 +106,7 @@ pipeline:
       roles: [architect]
       gate: human
     - name: implement
-      roles: [implementer]
+      roles: [dev]
       gate: auto
     - name: test
       roles: [qa]
@@ -162,6 +162,6 @@ In HOTL mode:
 | Role | Stages | Writes | Purpose |
 |------|--------|--------|---------|
 | architect | design, plan, review | No | Design and critique |
-| implementer | implement | Yes (src/, lib/) | Write production code |
+| dev | implement | Yes (src/, lib/) | Write production code |
 | qa | test | Yes (tests/) | Write tests |
 | reviewer | review | No | Check correctness and security |

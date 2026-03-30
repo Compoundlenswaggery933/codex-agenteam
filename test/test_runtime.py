@@ -106,7 +106,7 @@ class TestRoleResolution:
         assert "researcher" in roles
         assert "pm" in roles
         assert "architect" in roles
-        assert "implementer" in roles
+        assert "dev" in roles
         assert "reviewer" in roles
         assert "qa" in roles
 
@@ -172,7 +172,7 @@ class TestTomlGeneration:
 
         agents_dir = tmp_path / ".codex" / "agents"
         assert (agents_dir / "architect.toml").exists()
-        assert (agents_dir / "implementer.toml").exists()
+        assert (agents_dir / "dev.toml").exists()
         assert (agents_dir / "reviewer.toml").exists()
         assert (agents_dir / "qa.toml").exists()
 
@@ -195,7 +195,7 @@ class TestTomlGeneration:
         make_config(tmp_path)
         run_rt("generate", cwd=str(tmp_path))
 
-        agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / "implementer.toml"))
+        agent = toml_lib.load(str(tmp_path / ".codex" / "agents" / "dev.toml"))
         assert agent.get("model") == "gpt-5.3-codex"
         assert agent.get("model_reasoning_effort") == "medium"
         assert agent.get("sandbox_mode") == "workspace-write"
@@ -208,7 +208,7 @@ class TestTomlGeneration:
 
         inherited_roles = {"architect", "pm", "researcher", "reviewer"}
         pinned_roles = {
-            "implementer": "gpt-5.3-codex",
+            "dev": "gpt-5.3-codex",
             "qa": "gpt-5.3-codex",
         }
 
@@ -301,7 +301,7 @@ class TestDispatch:
         assert plan["stage"] == "implement"
         assert plan["policy"] == "serial"
         assert len(plan["dispatch"]) > 0
-        assert plan["dispatch"][0]["role"] == "implementer"
+        assert plan["dispatch"][0]["role"] == "dev"
         assert plan["dispatch"][0]["mode"] == "write"
 
     def test_dispatch_review_readonly(self, tmp_path):
@@ -338,9 +338,9 @@ class TestDispatch:
         r = run_rt("dispatch", "implement", "--task", "test", "--run-id", run_id, cwd=str(tmp_path))
         assert r.returncode == 0
         plan = json.loads(r.stdout)
-        # implementer should be blocked because another writer holds the lock
+        # dev should be blocked because another writer holds the lock
         assert len(plan["blocked"]) > 0
-        assert plan["blocked"][0]["role"] == "implementer"
+        assert plan["blocked"][0]["role"] == "dev"
 
     def test_e2e_default_pipeline_dispatches_all_six_builtin_roles(self, tmp_path):
         """Walk the default pipeline and verify all built-in agents are dispatched."""
@@ -392,7 +392,7 @@ class TestDispatch:
             "researcher",
             "pm",
             "architect",
-            "implementer",
+            "dev",
             "qa",
             "reviewer",
         }

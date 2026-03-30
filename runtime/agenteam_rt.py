@@ -460,8 +460,8 @@ ATEAM_ARTIFACT_PATHS = {
     "researcher": "docs/research/",
     "pm": "docs/strategies/",
     "architect": "docs/designs/",
-    "implementer_plans": "docs/plans/",
-    "implementer_code": ["src/", "lib/"],
+    "dev_plans": "docs/plans/",
+    "dev_code": ["src/", "lib/"],
     "qa": ["tests/"],
 }
 
@@ -470,8 +470,8 @@ HOTL_ARTIFACT_PATHS = {
     "researcher": "docs/research/",
     "pm": "docs/strategies/",
     "architect": "docs/plans/",             # HOTL uses docs/plans/ for design docs
-    "implementer_plans": "./",              # HOTL puts hotl-workflow-*.md at project root
-    "implementer_code": ["src/", "lib/"],
+    "dev_plans": "./",              # HOTL puts hotl-workflow-*.md at project root
+    "dev_code": ["src/", "lib/"],
     "qa": ["tests/"],
 }
 

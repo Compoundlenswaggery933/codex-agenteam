@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## What This Is
 
-AgenTeam (`codex-agenteam`) is a Codex plugin that provides role-based team collaboration for AI-assisted development. Roles (architect, implementer, reviewer, qa) are defined as YAML templates, materialized into Codex-native custom agents (`.codex/agents/*.toml`), and orchestrated through a configurable pipeline.
+AgenTeam (`codex-agenteam`) is a Codex plugin that provides role-based team collaboration for AI-assisted development. Roles (architect, dev, reviewer, qa) are defined as YAML templates, materialized into Codex-native custom agents (`.codex/agents/*.toml`), and orchestrated through a configurable pipeline.
 
 ## Commands
 

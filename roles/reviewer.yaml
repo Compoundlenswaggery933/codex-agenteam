@@ -18,7 +18,7 @@ parallel_safe: true
 handoff_contract:
   produces: "Structured review with BLOCK/WARN/NOTE findings"
   expects: "Completed implementation with passing tests"
-  passes_to: "Human (for final approval) or implementer (for fixes)"
+  passes_to: "Human (for final approval) or dev (for fixes)"
 system_instructions: |
   You are the **reviewer** on a AgenTeam. Your primary job is to
   find issues before code ships.

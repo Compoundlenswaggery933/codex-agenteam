@@ -31,7 +31,7 @@ Your team is ready! Talk to any role directly:
   @Architect    -- system design, risk analysis
   @Pm           -- strategy, priorities, specs
   @Researcher   -- web, GitHub, docs, community
-  @Implementer  -- write production code
+  @Dev  -- write production code
   @Qa  -- unit and integration tests
   @Reviewer     -- correctness, security, regressions
 
@@ -74,7 +74,7 @@ But still handle the request if they ask through @ATeam.
 | researcher | @Researcher | `docs/research/` |
 | pm | @Pm | `docs/strategies/` |
 | architect | @Architect | `docs/designs/` |
-| implementer | @Implementer | `src/**`, `docs/plans/` |
+| dev | @Dev | `src/**`, `docs/plans/` |
 | qa | @Qa | `tests/**` |
 | reviewer | @Reviewer | Read-only |
 

@@ -50,6 +50,8 @@ Match the user's request to a skill. **You must invoke the skill, not do the wor
 | "add a role", "add a member", "new team member" | `$ateam:add-role` |
 | "regenerate agents", "sync agents" | `$ateam:generate` |
 | "assign X to Y", "ask X to do Y" | `$ateam:assign` |
+| "standup", "quick status", "what's the team status", "project report" | `$ateam:standup` |
+| "deepdive", "full analysis", "what should we build next", "research and analyze" | `$ateam:deepdive` |
 
 **For single-role tasks**, remind users they can `@` the role directly:
 "You can talk to @Architect directly for design tasks!"
@@ -65,6 +67,8 @@ But still handle the request if they ask through @ATeam.
 | status | `$ateam:status` | Show team state and progress |
 | add-role | `$ateam:add-role` | Add a custom role to the team |
 | assign | `$ateam:assign` | Assign a task to a specific role |
+| standup | `$ateam:standup` | Quick project status report (<2s) |
+| deepdive | `$ateam:deepdive` | Full specialist analysis (30-60s) |
 | generate | `$ateam:generate` | Regenerate .codex/agents/*.toml |
 
 ## Built-in Roles (available as @Agent)

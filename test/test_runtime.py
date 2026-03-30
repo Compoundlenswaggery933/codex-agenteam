@@ -443,3 +443,201 @@ class TestHotlDetection:
         result = json.loads(r.stdout)
         assert "available" in result
         assert "path" in result
+
+
+# ---------------------------------------------------------------------------
+# Standup
+# ---------------------------------------------------------------------------
+
+class TestStandup:
+    def test_standup_no_active_run(self, tmp_path):
+        """Standup with no runs should return health=no-active-run and run=null."""
+        make_config(tmp_path)
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["health"] == "no-active-run"
+        assert result["run"] is None
+        assert result["stages"] == {}
+        assert result["dispatch_mode"] is False
+        assert "roles" in result
+        assert "artifact_paths" in result
+        assert "output_path" in result
+        assert result["output_path"].startswith("docs/meetings/")
+        assert result["output_path"].endswith("-standup.md")
+        assert result["warnings"] == []
+
+    def test_standup_with_active_run(self, tmp_path):
+        """Standup after init should include run state and on-track health."""
+        make_config(tmp_path)
+        init_r = run_rt("init", "--task", "build feature X", cwd=str(tmp_path))
+        assert init_r.returncode == 0
+        run_id = json.loads(init_r.stdout)["run_id"]
+
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["health"] == "on-track"
+        assert result["run"] is not None
+        assert result["run"]["run_id"] == run_id
+        assert result["run"]["task"] == "build feature X"
+        assert result["run"]["current_stage"] == "research"
+        assert "design" in result["stages"]
+        assert result["stages"]["design"]["status"] == "pending"
+
+    def test_standup_returns_all_default_roles(self, tmp_path):
+        """Standup should list all 6 built-in roles."""
+        make_config(tmp_path)
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert set(result["roles"]) == {
+            "researcher", "pm", "architect", "dev", "qa", "reviewer"
+        }
+        # roles should be sorted
+        assert result["roles"] == sorted(result["roles"])
+
+    def test_standup_dispatch_flag(self, tmp_path):
+        """--dispatch flag sets dispatch_mode=true."""
+        make_config(tmp_path)
+        r = run_rt("standup", "--dispatch", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["dispatch_mode"] is True
+
+    def test_standup_task_context(self, tmp_path):
+        """--task flag adds task_context to output."""
+        make_config(tmp_path)
+        r = run_rt("standup", "--task", "focus on auth module", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["task_context"] == "focus on auth module"
+
+    def test_standup_no_task_context_omitted(self, tmp_path):
+        """Without --task, task_context key should not be present."""
+        make_config(tmp_path)
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert "task_context" not in result
+
+    def test_standup_off_track_blocked(self, tmp_path):
+        """A blocked stage triggers off-track health."""
+        make_config(tmp_path)
+        init_r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        state = json.loads(init_r.stdout)
+        run_id = state["run_id"]
+
+        # Set a stage to blocked
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        state["stages"]["implement"]["status"] = "blocked"
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["health"] == "off-track"
+        assert any("blocked" in w for w in result["warnings"])
+
+    def test_standup_off_track_failed(self, tmp_path):
+        """A failed stage triggers off-track health."""
+        make_config(tmp_path)
+        init_r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        state = json.loads(init_r.stdout)
+        run_id = state["run_id"]
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        state["stages"]["test"]["status"] = "failed"
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["health"] == "off-track"
+        assert any("failed" in w for w in result["warnings"])
+
+    def test_standup_at_risk_gate_rejection(self, tmp_path):
+        """An in-progress stage with gate=rejected triggers at-risk health."""
+        make_config(tmp_path)
+        init_r = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        state = json.loads(init_r.stdout)
+        run_id = state["run_id"]
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        state["stages"]["design"]["status"] = "in-progress"
+        state["stages"]["design"]["gate"] = "rejected"
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["health"] == "at-risk"
+        assert any("gate rejection" in w for w in result["warnings"])
+
+    def test_standup_includes_artifact_paths(self, tmp_path):
+        """Standup should include artifact paths."""
+        make_config(tmp_path)
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert "researcher" in result["artifact_paths"]
+        assert "architect" in result["artifact_paths"]
+        assert "qa" in result["artifact_paths"]
+
+    def test_standup_many_roles_warning(self, tmp_path):
+        """More than 6 roles should trigger the thread warning."""
+        config_path = tmp_path / "agenteam.yaml"
+        roles = {}
+        for i in range(8):
+            roles[f"custom_role_{i}"] = {
+                "description": f"Custom role {i}",
+                "participates_in": ["review"],
+                "can_write": False,
+            }
+        config = {
+            "version": "1",
+            "team": {"pipeline": "standalone", "parallel_writes": {"mode": "serial"}},
+            "roles": roles,
+            "pipeline": {"stages": []},
+        }
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        # 6 built-in + 8 custom = 14 roles
+        assert len(result["roles"]) == 14
+        assert any("max_threads" in w for w in result["warnings"])
+        assert any("above 12" in w for w in result["warnings"])
+
+    def test_standup_dispatch_output_path_deepdive(self, tmp_path):
+        """--dispatch produces output_path ending in -deepdive.md."""
+        make_config(tmp_path)
+        r = run_rt("standup", "--dispatch", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["output_path"].endswith("-deepdive.md")
+
+    def test_standup_dispatch_includes_dispatch_list(self, tmp_path):
+        """--dispatch includes a dispatch list with researcher, architect, pm."""
+        make_config(tmp_path)
+        r = run_rt("standup", "--dispatch", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert "dispatch" in result
+        role_names = [d["role"] for d in result["dispatch"]]
+        assert set(role_names) == {"researcher", "architect", "pm"}
+        for d in result["dispatch"]:
+            assert d["agent"].endswith(".toml")
+
+    def test_standup_no_dispatch_omits_dispatch_list(self, tmp_path):
+        """Without --dispatch, dispatch key should not be present."""
+        make_config(tmp_path)
+        r = run_rt("standup", cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert "dispatch" not in result

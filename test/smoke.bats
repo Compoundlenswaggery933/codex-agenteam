@@ -56,6 +56,14 @@ print('OK')
   [ -s "$PLUGIN_DIR/skills/generate/SKILL.md" ]
 }
 
+@test "standup SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/standup/SKILL.md" ]
+}
+
+@test "deepdive SKILL.md exists and is non-empty" {
+  [ -s "$PLUGIN_DIR/skills/deepdive/SKILL.md" ]
+}
+
 # -----------------------------------------------------------------------
 # Role templates
 # -----------------------------------------------------------------------

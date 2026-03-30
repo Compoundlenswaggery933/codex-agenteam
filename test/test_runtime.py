@@ -108,7 +108,7 @@ class TestRoleResolution:
         assert "architect" in roles
         assert "implementer" in roles
         assert "reviewer" in roles
-        assert "test_writer" in roles
+        assert "qa" in roles
 
     def test_role_override(self, tmp_path):
         make_config(tmp_path)
@@ -174,7 +174,7 @@ class TestTomlGeneration:
         assert (agents_dir / "architect.toml").exists()
         assert (agents_dir / "implementer.toml").exists()
         assert (agents_dir / "reviewer.toml").exists()
-        assert (agents_dir / "test_writer.toml").exists()
+        assert (agents_dir / "qa.toml").exists()
 
     def test_toml_has_flat_structure(self, tmp_path):
         import toml as toml_lib
@@ -209,7 +209,7 @@ class TestTomlGeneration:
         inherited_roles = {"architect", "pm", "researcher", "reviewer"}
         pinned_roles = {
             "implementer": "gpt-5.3-codex",
-            "test_writer": "gpt-5.3-codex",
+            "qa": "gpt-5.3-codex",
         }
 
         for role_name in inherited_roles:
@@ -393,7 +393,7 @@ class TestDispatch:
             "pm",
             "architect",
             "implementer",
-            "test_writer",
+            "qa",
             "reviewer",
         }
         assert stage_dispatch_counts["design"] == 3

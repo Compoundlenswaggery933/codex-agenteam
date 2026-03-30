@@ -1,6 +1,6 @@
 # AgenTeam -- Specialist AI Agents as Your Team for Codex
 
-**AgenTeam** is a [Codex](https://codex.ai) plugin that turns a single AI session into a team of specialists. Define roles like architect, implementer, test-writer, and reviewer -- then orchestrate them through a configurable pipeline. Each role becomes a Codex-native custom agent (`.codex/agents/*.toml`) with its own model, permissions, and write scope.
+**AgenTeam** is a [Codex](https://codex.ai) plugin that turns a single AI session into a team of specialists. Define roles like architect, implementer, qa, and reviewer -- then orchestrate them through a configurable pipeline. Each role becomes a Codex-native custom agent (`.codex/agents/*.toml`) with its own model, permissions, and write scope.
 
 > Design. Plan. Implement. Test. Review. -- All in one session.
 
@@ -53,7 +53,7 @@ Role-level:
 @Implementer  -- write production code
 @Pm           -- strategy, priorities, specs
 @Researcher   -- web, GitHub, docs, community
-@Test Writer  -- unit and integration tests
+@Qa           -- unit and integration tests
 ```
 
 Examples:
@@ -111,7 +111,7 @@ In the Codex App, `@` any team member directly:
 ```
 @Architect propose an approach for caching
 @Implementer implement the caching layer per the approved plan
-@Test Writer add integration tests for the cache
+@Qa add integration tests for the cache
 @Reviewer review the caching implementation
 @Pm prioritize the backlog for next sprint
 @Researcher what are others doing for rate limiting?
@@ -151,7 +151,7 @@ $ateam:generate
 **Bug fix with review:**
 ```
 @Implementer fix the race condition in src/queue.py -- see issue #42
-@Test Writer add a regression test for the queue race condition
+@Qa add a regression test for the queue race condition
 @Reviewer review the queue fix and test
 ```
 
@@ -177,7 +177,7 @@ AgenTeam infers the role config, confirms with you, writes to `agenteam.yaml`, a
 | **pm** | strategy, design | `docs/strategies/` | Inherits user default | Decide what to build, prioritize, write specs |
 | **architect** | design, review | `docs/designs/` | Inherits user default | Design systems, critique plans, identify risks |
 | **implementer** | plan, implement | `docs/plans/`, `src/**`, `lib/**` | gpt-5.3-codex | Translate designs into plans, then write code |
-| **test_writer** | test | `tests/**`, `*.test.*` | gpt-5.3-codex | Write unit and integration tests |
+| **qa** | test | `tests/**`, `*.test.*` | gpt-5.3-codex | Write unit and integration tests |
 | **reviewer** | review | Read-only | Inherits user default | Review for correctness, security, and regressions |
 
 Each role writes to a scoped directory -- no overlaps, safe for parallel execution.
@@ -233,7 +233,7 @@ pipeline:
       roles: [implementer]
       gate: auto
     - name: test
-      roles: [test_writer]
+      roles: [qa]
       gate: auto
     - name: review
       roles: [reviewer]
@@ -275,7 +275,7 @@ AgenTeam enforces write safety so agents don't step on each other:
 2. **PM** decides what to build based on research and strategy -> `docs/strategies/`
 3. **Architect** (with PM + researcher input) designs the solution -> `docs/designs/`
 4. **Implementer** translates design into a step-by-step plan -> `docs/plans/`, then writes code
-5. **Test Writer** creates test coverage
+5. **Qa** creates test coverage
 6. **Reviewer** checks for correctness, security, and regressions
 
 ## Installation

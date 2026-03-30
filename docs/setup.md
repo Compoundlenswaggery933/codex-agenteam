@@ -55,7 +55,7 @@ This orchestrates the full pipeline:
 1. **Design** — Architect analyzes requirements and proposes approaches
 2. **Plan** — Architect creates an implementation plan
 3. **Implement** — Implementer writes the code
-4. **Test** — Test writer creates test coverage
+4. **Test** — Qa creates test coverage
 5. **Review** — Reviewer checks for correctness and security
 
 ### 3. Dispatch a Role Directly
@@ -109,7 +109,7 @@ pipeline:
       roles: [implementer]
       gate: auto
     - name: test
-      roles: [test_writer]
+      roles: [qa]
       gate: auto
     - name: review
       roles: [reviewer]
@@ -163,5 +163,5 @@ In HOTL mode:
 |------|--------|--------|---------|
 | architect | design, plan, review | No | Design and critique |
 | implementer | implement | Yes (src/, lib/) | Write production code |
-| test_writer | test | Yes (tests/) | Write tests |
+| qa | test | Yes (tests/) | Write tests |
 | reviewer | review | No | Check correctness and security |

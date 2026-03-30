@@ -22,7 +22,7 @@ parallel_safe: false
 handoff_contract:
   produces: "Implementation plan in docs/plans/ and working code that passes existing tests"
   expects: "Approved design doc from architect (docs/designs/)"
-  passes_to: "test_writer (for test coverage) then reviewer (for review)"
+  passes_to: "qa (for test coverage) then reviewer (for review)"
 system_instructions: |
   You are the **implementer** on a AgenTeam. Your primary job is to
   translate design docs into implementation plans, then write code.

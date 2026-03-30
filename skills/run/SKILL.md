@@ -109,10 +109,10 @@ b. PLAN STAGE:
 
 c. IMPLEMENT + TEST STAGE:
    - Resolve roles: agenteam-rt dispatch implement -> {implementer}
-   - Resolve roles: agenteam-rt dispatch test -> {test_writer}
+   - Resolve roles: agenteam-rt dispatch test -> {qa}
    - Invoke HOTL loop-execution or subagent-execution
    - HOTL executes workflow steps
-   - Implementer and test_writer agents are the workers
+   - Implementer and qa agents are the workers
    - Write policy enforced: serial by default
 
 d. REVIEW STAGE:

@@ -85,8 +85,8 @@ print('OK')
   [ "$status" -eq 0 ]
 }
 
-@test "test-writer.yaml exists and is valid YAML" {
-  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/test-writer.yaml'))"
+@test "qa.yaml exists and is valid YAML" {
+  run python3 -c "import yaml; yaml.safe_load(open('$PLUGIN_DIR/roles/qa.yaml'))"
   [ "$status" -eq 0 ]
 }
 
@@ -110,4 +110,18 @@ print('OK')
 
 @test "requirements.txt exists" {
   [ -f "$PLUGIN_DIR/runtime/requirements.txt" ]
+}
+
+@test "update.sh --local refreshes Codex plugin cache" {
+  local tmp_home
+  tmp_home="$(mktemp -d "${BATS_TEST_TMPDIR}/ateam-update-home.XXXXXX")"
+  local cache_dir="$tmp_home/.codex/plugins/cache/codex-plugins/ateam/stable"
+
+  mkdir -p "$cache_dir"
+  echo "stale" > "$cache_dir/OLD_MARKER.txt"
+
+  run env HOME="$tmp_home" bash "$PLUGIN_DIR/update.sh" --local
+  [ "$status" -eq 0 ]
+  [ -f "$cache_dir/.codex-plugin/plugin.json" ]
+  [ ! -e "$cache_dir/OLD_MARKER.txt" ]
 }

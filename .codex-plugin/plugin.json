@@ -17,7 +17,7 @@
     "architect",
     "implementer",
     "reviewer",
-    "test-writer",
+    "qa",
     "pipeline",
     "agents",
     "orchestration"
@@ -25,7 +25,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "ATeam",
-    "shortDescription": "AI dev team -- @Researcher, @Pm, @Architect, @Implementer, @Test Writer, @Reviewer.",
+    "shortDescription": "AI dev team -- @Researcher, @Pm, @Architect, @Implementer, @Qa, @Reviewer.",
     "longDescription": "ATeam provides 6 specialist roles as Codex agents. Talk to @Architect, @Reviewer, @Pm directly, or use @ATeam to run the full pipeline. Configure roles, write policies, and custom team members via .agenteam/config.yaml.",
     "developerName": "Yiming Wu",
     "category": "Productivity",
@@ -38,6 +38,6 @@
     "websiteURL": "https://github.com/yimwoo/codex-agenteam",
     "brandColor": "#2563EB",
     "composerIcon": "./assets/agenteam-icon.png",
-    "logo": "./assets/agenteam-logo.png"
+    "logo": "./assets/agenteam-icon.png"
   }
 }

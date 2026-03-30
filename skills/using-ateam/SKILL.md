@@ -32,7 +32,7 @@ Your team is ready! Talk to any role directly:
   @Pm           -- strategy, priorities, specs
   @Researcher   -- web, GitHub, docs, community
   @Implementer  -- write production code
-  @Test Writer  -- unit and integration tests
+  @Qa  -- unit and integration tests
   @Reviewer     -- correctness, security, regressions
 
 Or use @ATeam to run the full pipeline or manage the team.
@@ -75,7 +75,7 @@ But still handle the request if they ask through @ATeam.
 | pm | @Pm | `docs/strategies/` |
 | architect | @Architect | `docs/designs/` |
 | implementer | @Implementer | `src/**`, `docs/plans/` |
-| test_writer | @Test Writer | `tests/**` |
+| qa | @Qa | `tests/**` |
 | reviewer | @Reviewer | Read-only |
 
 ## Reminders

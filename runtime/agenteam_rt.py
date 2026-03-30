@@ -462,7 +462,7 @@ ATEAM_ARTIFACT_PATHS = {
     "architect": "docs/designs/",
     "implementer_plans": "docs/plans/",
     "implementer_code": ["src/", "lib/"],
-    "test_writer": ["tests/"],
+    "qa": ["tests/"],
 }
 
 # HOTL artifact paths (when HOTL is active)
@@ -472,7 +472,7 @@ HOTL_ARTIFACT_PATHS = {
     "architect": "docs/plans/",             # HOTL uses docs/plans/ for design docs
     "implementer_plans": "./",              # HOTL puts hotl-workflow-*.md at project root
     "implementer_code": ["src/", "lib/"],
-    "test_writer": ["tests/"],
+    "qa": ["tests/"],
 }
 
 

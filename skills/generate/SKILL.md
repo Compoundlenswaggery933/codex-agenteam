@@ -39,7 +39,7 @@ Generated agents:
   .codex/agents/architect.toml      (updated)
   .codex/agents/implementer.toml    (updated)
   .codex/agents/reviewer.toml       (updated)
-  .codex/agents/test_writer.toml    (updated)
+  .codex/agents/qa.toml    (updated)
 ```
 
 If custom roles were included, highlight them:

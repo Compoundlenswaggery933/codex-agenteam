@@ -20,7 +20,7 @@ roles:
       - "lib/**"
       - "docs/plans/**"
 
-  test_writer:
+  qa:
     model: gpt-5.3-codex
     can_write: true
     write_scope:
@@ -81,7 +81,7 @@ pipeline:
 
     - name: test
       roles:
-        - test_writer
+        - qa
       gate: auto
 
     - name: review

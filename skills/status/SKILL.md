@@ -29,7 +29,7 @@ Stages:
   design     ✓ completed  [architect]        gate: approved
   plan       ✓ completed  [architect]        gate: approved
   implement  → in_progress [implementer]     write_lock: active
-  test       · pending     [test_writer]
+  test       · pending     [qa]
   review     · pending     [reviewer]
 
 Write Policy: serial

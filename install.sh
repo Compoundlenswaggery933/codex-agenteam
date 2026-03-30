@@ -17,6 +17,16 @@ CODEX_PLUGIN_CACHE_ROOT="$HOME/.codex/plugins/cache/codex-plugins/ateam"
 # Helpers
 # ---------------------------------------------------------------------------
 
+ensure_python_dependencies() {
+  if python3 -c "import yaml, toml" >/dev/null 2>&1; then
+    echo "Python dependencies already available."
+    return 0
+  fi
+
+  echo "Installing Python dependencies..."
+  python3 -m pip install -r runtime/requirements.txt --quiet
+}
+
 refresh_codex_plugin_cache() {
   local source_dir="$1"
   local cache_root="${CODEX_PLUGIN_CACHE_ROOT}"
@@ -175,9 +185,8 @@ fi
 # Install Python dependencies
 # ---------------------------------------------------------------------------
 
-echo "Installing Python dependencies..."
 cd "$PLUGIN_PATH"
-pip install -r runtime/requirements.txt --quiet
+ensure_python_dependencies
 cd - > /dev/null
 
 # ---------------------------------------------------------------------------

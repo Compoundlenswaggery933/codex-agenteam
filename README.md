@@ -191,11 +191,8 @@ AgenTeam is configured through `.agenteam/config.yaml` in your project root (or 
 ```yaml
 version: "1"
 
-team:
-  name: my-project-team
-  pipeline: standalone        # standalone | hotl | dispatch-only | auto
-  parallel_writes:
-    mode: serial              # serial | scoped | worktree
+# isolation: branch          # branch (default) | worktree | none
+# pipeline: hotl             # omit for auto-detect
 
 roles:
   # Analysis/review roles inherit the user's default Codex model
@@ -240,14 +237,11 @@ pipeline:
       gate: human
 ```
 
-### Pipeline Modes
+### Pipeline Execution
 
-| Mode | Behavior |
-|------|----------|
-| `standalone` | Built-in pipeline: design -> plan -> implement -> test -> review |
-| `hotl` | Integrates with [HOTL plugin](https://github.com/yimwoo/hotl) for structured workflow execution |
-| `dispatch-only` | No pipeline -- invoke roles ad-hoc via `$ateam:assign` |
-| `auto` | Detects HOTL availability and suggests integration; falls back to standalone |
+By default, AgenTeam auto-detects HOTL and uses it if available. Otherwise it
+runs the built-in standalone pipeline. To force HOTL, add `pipeline: hotl` to
+your config. To skip the pipeline entirely, just use `$ateam:assign` or `@` roles directly.
 
 ### Write Policy & Branch Isolation
 

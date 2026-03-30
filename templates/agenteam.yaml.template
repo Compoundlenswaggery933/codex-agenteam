@@ -1,17 +1,13 @@
 version: "1"
 
-# AgenTeam settings
-team:
-  name: my-project-team
-  pipeline: standalone          # auto | standalone | hotl | dispatch-only
+# --- Branch isolation for writing agents ---
+# isolation: branch           # branch (default) | worktree | none
 
-  parallel_writes:
-    mode: serial                # serial | scoped | worktree (v2+)
+# --- Force HOTL execution (auto-detected when omitted) ---
+# pipeline: hotl
 
-# Role overrides (deep-merged with plugin defaults)
-# Uncomment and modify to customize built-in roles
+# --- Role overrides (deep-merged with built-in defaults) ---
 roles:
-  # Analysis/review roles inherit the user's default Codex model unless overridden.
   dev:
     model: gpt-5.3-codex
     can_write: true
@@ -27,64 +23,41 @@ roles:
       - "tests/**"
       - "**/*.test.*"
 
-  reviewer:
-    can_write: false
-    participates_in:
-      - review
-
-  # Custom role example — uncomment and modify to add your own
+  # Custom role example — uncomment and modify
   # security_auditor:
-  #   base_agent: default
   #   description: "Reviews code for security vulnerabilities"
-  #   responsibilities:
-  #     - "Check for OWASP top 10 vulnerabilities"
-  #     - "Review auth/authz logic"
-  #     - "Flag hardcoded secrets"
-  #   participates_in:
-  #     - review
-  #   model: gpt-5.4
-  #   reasoning_effort: high
+  #   participates_in: [review]
   #   can_write: false
-  #   parallel_safe: true
   #   system_instructions: |
-  #     You are a security auditor. Focus exclusively on security concerns.
+  #     Focus on OWASP top 10, auth/authz logic, and hardcoded secrets.
 
-# Standalone pipeline stages (used when pipeline != hotl)
+# --- Pipeline stages (omit for ad-hoc dispatch only) ---
 pipeline:
   stages:
     - name: research
-      roles:
-        - researcher
+      roles: [researcher]
       gate: auto
 
     - name: strategy
-      roles:
-        - pm
+      roles: [pm]
       gate: human
 
     - name: design
-      roles:
-        - architect
-        - pm
-        - researcher
+      roles: [architect, pm, researcher]
       gate: human
 
     - name: plan
-      roles:
-        - dev
+      roles: [dev]
       gate: human
 
     - name: implement
-      roles:
-        - dev
+      roles: [dev]
       gate: auto
 
     - name: test
-      roles:
-        - qa
+      roles: [qa]
       gate: auto
 
     - name: review
-      roles:
-        - reviewer
+      roles: [reviewer]
       gate: human

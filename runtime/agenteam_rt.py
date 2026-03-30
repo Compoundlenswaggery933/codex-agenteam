@@ -29,10 +29,59 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-VALID_PIPELINES = {"standalone", "hotl", "dispatch-only", "auto"}
-VALID_WRITE_MODES = {"serial", "scoped", "worktree"}
+VALID_PIPELINES = {"standalone", "hotl", "dispatch-only", "auto"}  # legacy
+VALID_WRITE_MODES = {"serial", "scoped", "worktree"}  # legacy
+VALID_ISOLATION = {"branch", "worktree", "none"}
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 ROLES_DIR = PLUGIN_DIR / "roles"
+
+# Map legacy values to new schema
+_ISOLATION_MAP = {"serial": "branch", "scoped": "none", "worktree": "worktree"}
+
+
+def resolve_team_config(config: dict) -> tuple[str | None, str]:
+    """Resolve (pipeline_mode, isolation_mode) from either new or legacy schema.
+
+    New schema (flat keys):
+      isolation: branch | worktree | none
+      pipeline: hotl  (top-level string, optional -- only "hotl" is meaningful)
+
+    Legacy schema (nested team block):
+      team.pipeline: standalone | hotl | dispatch-only | auto
+      team.parallel_writes.mode: serial | scoped | worktree
+
+    Returns:
+      (pipeline_mode, isolation_mode)
+      pipeline_mode is None for auto-detect, or "hotl" for explicit HOTL.
+      isolation_mode is "branch" (default), "worktree", or "none".
+    """
+    # New schema (flat keys)
+    isolation = config.get("isolation")
+    # "pipeline" can be either a string (mode) or a dict (stages).
+    # Only treat it as a mode if it's a string.
+    pipeline_val = config.get("pipeline")
+    pipeline = pipeline_val if isinstance(pipeline_val, str) else None
+
+    # Legacy schema (nested team block)
+    team = config.get("team", {})
+    if isinstance(team, dict):
+        if not pipeline:
+            legacy_pipeline = team.get("pipeline")
+            if legacy_pipeline == "hotl":
+                pipeline = "hotl"
+            # standalone, auto, dispatch-only all resolve to None (auto-detect)
+
+        if not isolation:
+            pw = team.get("parallel_writes", {})
+            if isinstance(pw, dict):
+                legacy_mode = pw.get("mode")
+                if legacy_mode:
+                    isolation = _ISOLATION_MAP.get(legacy_mode, legacy_mode)
+
+    # Defaults
+    isolation = isolation or "branch"
+    # pipeline: None means auto-detect at runtime
+    return pipeline, isolation
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +130,7 @@ def load_config(path: Path) -> dict:
 
 
 def validate_config(config: dict) -> None:
-    """Validate required fields and enum values."""
+    """Validate required fields and enum values (new + legacy schema)."""
     errors = []
 
     if not isinstance(config, dict):
@@ -90,19 +139,57 @@ def validate_config(config: dict) -> None:
     if "version" not in config:
         errors.append("Missing required field: version")
 
+    # --- New schema validation (flat keys) ---
+    isolation = config.get("isolation")
+    if isolation and isolation not in VALID_ISOLATION:
+        errors.append(
+            f"Invalid isolation: '{isolation}'. "
+            f"Must be one of: {', '.join(sorted(VALID_ISOLATION))}"
+        )
+
+    # Top-level "pipeline" can be a string (mode) or dict (stages).
+    # Only validate if it's a string.
+    pipeline_val = config.get("pipeline")
+    if isinstance(pipeline_val, str) and pipeline_val != "hotl":
+        errors.append(
+            f"Invalid pipeline: '{pipeline_val}'. "
+            "Only 'hotl' is valid as a top-level string. "
+            "Omit for auto-detect, or use pipeline.stages for stage definitions."
+        )
+
+    # --- Legacy schema validation (nested team block) ---
     team = config.get("team", {})
     if not isinstance(team, dict):
         errors.append("'team' must be a mapping")
-    else:
-        pipeline = team.get("pipeline")
-        if pipeline and pipeline not in VALID_PIPELINES:
-            errors.append(f"Invalid pipeline: '{pipeline}'. Must be one of: {', '.join(sorted(VALID_PIPELINES))}")
+    elif team:
+        # Emit deprecation warnings for legacy keys
+        legacy_pipeline = team.get("pipeline")
+        if legacy_pipeline:
+            if legacy_pipeline not in VALID_PIPELINES:
+                errors.append(
+                    f"Invalid team.pipeline: '{legacy_pipeline}'. "
+                    f"Must be one of: {', '.join(sorted(VALID_PIPELINES))}"
+                )
+            else:
+                print(json.dumps({
+                    "warning": f"Legacy config key 'team.pipeline: {legacy_pipeline}' found. "
+                               "Consider using top-level 'pipeline: hotl' or omitting for auto-detect."
+                }), file=sys.stderr)
 
         pw = team.get("parallel_writes", {})
-        if isinstance(pw, dict):
+        if isinstance(pw, dict) and pw:
             mode = pw.get("mode")
-            if mode and mode not in VALID_WRITE_MODES:
-                errors.append(f"Invalid parallel_writes.mode: '{mode}'. Must be one of: {', '.join(sorted(VALID_WRITE_MODES))}")
+            if mode:
+                if mode not in VALID_WRITE_MODES:
+                    errors.append(
+                        f"Invalid team.parallel_writes.mode: '{mode}'. "
+                        f"Must be one of: {', '.join(sorted(VALID_WRITE_MODES))}"
+                    )
+                else:
+                    print(json.dumps({
+                        "warning": f"Legacy config key 'team.parallel_writes.mode: {mode}' found. "
+                                   f"Consider using top-level 'isolation: {_ISOLATION_MAP.get(mode, mode)}'."
+                    }), file=sys.stderr)
 
     if errors:
         raise ValueError("; ".join(errors))
@@ -258,7 +345,8 @@ def cmd_init(args, config: dict) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
 
     # Build initial state
-    pipeline_mode = config.get("team", {}).get("pipeline", "standalone")
+    pipeline_mode, _ = resolve_team_config(config)
+    pipeline_mode = pipeline_mode or "standalone"
     stages = get_pipeline_stages(config)
 
     state = {
@@ -348,7 +436,11 @@ def cmd_dispatch(args, config: dict) -> None:
 
     roles = resolve_roles(config)
     role_names = stage_config.get("roles", [])
-    write_mode = config.get("team", {}).get("parallel_writes", {}).get("mode", "serial")
+    _, isolation_mode = resolve_team_config(config)
+    # Map isolation to write_mode for dispatch logic
+    write_mode = "serial" if isolation_mode == "branch" else (
+        "worktree" if isolation_mode == "worktree" else "scoped"
+    )
 
     # Load current state for write locks
     state = None
@@ -393,7 +485,7 @@ def cmd_dispatch(args, config: dict) -> None:
     plan = {
         "stage": stage_name,
         "dispatch": dispatch_list,
-        "policy": write_mode,
+        "policy": isolation_mode,
         "gate": stage_config.get("gate", "auto"),
         "blocked": blocked,
     }
@@ -421,7 +513,7 @@ def cmd_policy_check(args, config: dict) -> None:
                 overlaps.append({"roles": [n1, n2], "overlapping_scopes": sorted(common)})
 
     result = {
-        "policy": config.get("team", {}).get("parallel_writes", {}).get("mode", "serial"),
+        "policy": resolve_team_config(config)[1],  # isolation mode
         "writers": {n: r.get("write_scope", []) for n, r in writers.items()},
         "overlaps": overlaps,
         "safe_for_parallel": len(overlaps) == 0,
@@ -500,7 +592,8 @@ def cmd_health(args) -> None:
     else:
         config_exists = True
         config = load_config(config_path)
-        pipeline_mode = config.get("team", {}).get("pipeline", "standalone")
+        pm, _ = resolve_team_config(config)
+        pipeline_mode = pm or "standalone"
 
     hotl_info = hotl_available()
 
@@ -539,8 +632,7 @@ def make_task_slug(task: str) -> str:
 
 def cmd_branch_plan(args, config: dict) -> None:
     """Return a branch/worktree plan based on write mode and context."""
-    write_mode = config.get("team", {}).get("parallel_writes", {}).get("mode", "serial")
-    pipeline_mode = config.get("team", {}).get("pipeline", "standalone")
+    pipeline_mode, isolation_mode = resolve_team_config(config)
     task = args.task
     run_id = getattr(args, "run_id", None)
     role = getattr(args, "role", None)
@@ -558,15 +650,15 @@ def cmd_branch_plan(args, config: dict) -> None:
 
     slug = make_task_slug(task)
 
-    if write_mode == "scoped":
+    if isolation_mode == "none":
         print(json.dumps({
-            "mode": "scoped",
+            "mode": "none",
             "action": "use-current",
             "branch": None,
-            "warning": "Scoped mode uses the current branch. This is NOT isolation -- "
-                       "it trusts that write_scope patterns do not overlap. "
+            "warning": "isolation: none -- uses the current branch. This is NOT isolation. "
+                       "It trusts that write_scope patterns do not overlap. "
                        "Verify with: agenteam_rt.py policy check",
-            "pipeline_mode": pipeline_mode,
+            "pipeline_mode": pipeline_mode or "standalone",
         }))
         return
 
@@ -583,7 +675,7 @@ def cmd_branch_plan(args, config: dict) -> None:
         branch = f"ateam/{slug}"
         base_branch = "current"
 
-    if write_mode == "worktree":
+    if isolation_mode == "worktree":
         worktree_slug = f"{role or 'run'}-{slug}" if role else slug
         print(json.dumps({
             "mode": "worktree",
@@ -591,17 +683,17 @@ def cmd_branch_plan(args, config: dict) -> None:
             "branch": branch,
             "worktree_path": f".ateam-worktrees/{worktree_slug}",
             "base_branch": base_branch,
-            "pipeline_mode": pipeline_mode,
+            "pipeline_mode": pipeline_mode or "standalone",
         }))
         return
 
-    # Default: serial -> create branch
+    # Default: branch isolation
     print(json.dumps({
-        "mode": "serial",
+        "mode": "branch",
         "action": "create-branch",
         "branch": branch,
         "base_branch": base_branch,
-        "pipeline_mode": pipeline_mode,
+        "pipeline_mode": pipeline_mode or "standalone",
     }))
 
 
@@ -632,11 +724,11 @@ HOTL_ARTIFACT_PATHS = {
 
 def resolve_artifact_paths_for_config(config: dict) -> dict:
     """Resolve artifact paths, auto-detecting HOTL vs standalone."""
-    pipeline_mode = config.get("team", {}).get("pipeline", "standalone")
+    pipeline_mode, _ = resolve_team_config(config)
     hotl_info = hotl_available()
     hotl_in_project = hotl_active_in_project()
     use_hotl = (pipeline_mode == "hotl") or (
-        pipeline_mode == "auto" and hotl_info["available"] and hotl_in_project
+        pipeline_mode is None and hotl_info["available"] and hotl_in_project
     )
     return HOTL_ARTIFACT_PATHS if use_hotl else ATEAM_ARTIFACT_PATHS
 

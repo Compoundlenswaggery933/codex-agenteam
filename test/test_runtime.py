@@ -101,6 +101,24 @@ class TestConfigValidation:
         assert "version" in r.stderr
 
 
+class TestValidateCommand:
+    def test_validate_returns_summary_without_creating_state(self, tmp_path):
+        make_config(tmp_path)
+
+        r = run_rt("validate", cwd=str(tmp_path))
+
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result == {
+            "valid": True,
+            "pipeline_mode": "standalone",
+            "isolation_mode": "branch",
+            "role_count": 6,
+            "stage_count": 7,
+        }
+        assert not (tmp_path / ".agenteam" / "state").exists()
+
+
 # ---------------------------------------------------------------------------
 # Role resolution
 # ---------------------------------------------------------------------------
@@ -1492,3 +1510,455 @@ class TestConfigSimplification:
         result = json.loads(r.stdout)
         slug = result["branch"].replace("ateam/dev/", "")
         assert len(slug) <= 40
+
+
+# ---------------------------------------------------------------------------
+# Verify plan
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyPlan:
+    def _make_verify_config(self, tmp_path, stages=None, extra=None):
+        """Create a config with optional verify fields on stages."""
+        if stages is None:
+            stages = [
+                {"name": "implement", "roles": ["dev"], "gate": "auto",
+                 "verify": "python3 -m pytest tests/ -v", "max_retries": 2},
+                {"name": "design", "roles": ["architect"], "gate": "human"},
+            ]
+        config = {
+            "version": "1",
+            "pipeline": {"stages": stages},
+        }
+        if extra:
+            config.update(extra)
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+    def test_verify_plan_from_config(self, tmp_path):
+        """Stage with explicit verify returns config source and command."""
+        self._make_verify_config(tmp_path)
+        r = run_rt("verify-plan", "implement", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["stage"] == "implement"
+        assert plan["verify"] == "python3 -m pytest tests/ -v"
+        assert plan["source"] == "config"
+        assert plan["max_retries"] == 2
+        assert plan["attempt"] == 1
+        assert "cwd" in plan
+
+    def test_verify_plan_auto_detected(self, tmp_path):
+        """Stage without verify auto-detects from repo signals."""
+        self._make_verify_config(tmp_path)
+        # Create a tests/ directory so auto-detection fires
+        (tmp_path / "tests").mkdir()
+        r = run_rt("verify-plan", "design", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["stage"] == "design"
+        assert plan["verify"] == "python3 -m pytest -v"
+        assert plan["source"] == "auto-detected"
+        assert plan["attempt"] == 1
+        assert "cwd" in plan
+
+    def test_verify_plan_none_detected(self, tmp_path):
+        """Stage without verify and no repo signals returns null verify."""
+        self._make_verify_config(tmp_path)
+        # No tests/ dir, no pytest.ini, etc. in tmp_path
+        r = run_rt("verify-plan", "design", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["verify"] is None
+        assert plan["source"] == "none"
+        assert plan["max_retries"] == 0
+        assert plan["attempt"] == 0
+        assert "cwd" not in plan
+
+    def test_verify_plan_nonexistent_stage(self, tmp_path):
+        """Requesting verify-plan for a nonexistent stage returns error."""
+        self._make_verify_config(tmp_path)
+        r = run_rt("verify-plan", "nonexistent", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+    def test_verify_plan_attempt_increments_with_state(self, tmp_path):
+        """Attempt number reflects existing verify_attempts in state."""
+        self._make_verify_config(tmp_path)
+        # Init a run to get state
+        r_init = run_rt("init", "--task", "test", cwd=str(tmp_path))
+        assert r_init.returncode == 0
+        run_id = json.loads(r_init.stdout)["run_id"]
+
+        # Record a verify attempt by writing state directly
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["implement"]["verify_attempts"] = [
+            {"attempt": 1, "result": "fail", "output": "1 test failed"},
+        ]
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+
+        r = run_rt("verify-plan", "implement", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["attempt"] == 2
+
+    def test_verify_plan_cwd_is_project_root(self, tmp_path):
+        """cwd should be the project root (tmp_path) in branch mode."""
+        self._make_verify_config(tmp_path)
+        r = run_rt("verify-plan", "implement", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["cwd"] == str(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Record verify
+# ---------------------------------------------------------------------------
+
+
+class TestRecordVerify:
+    def _setup_run(self, tmp_path):
+        """Create a config and init a run, returning run_id."""
+        config = {
+            "version": "1",
+            "pipeline": {
+                "stages": [
+                    {"name": "implement", "roles": ["dev"], "gate": "auto",
+                     "verify": "python3 -m pytest -v", "max_retries": 2},
+                    {"name": "test", "roles": ["qa"], "gate": "auto"},
+                ]
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("init", "--task", "verify test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_record_pass(self, tmp_path):
+        """Recording a pass result persists in state."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "implement", "--result", "pass",
+            "--output", "all tests passed",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["recorded"] is True
+        assert result["attempt"] == 1
+        assert result["result"] == "pass"
+
+        # Verify state file
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        stage = state["stages"]["implement"]
+        assert stage["verify_result"] == "pass"
+        assert len(stage["verify_attempts"]) == 1
+        assert stage["verify_attempts"][0]["output"] == "all tests passed"
+
+    def test_record_fail(self, tmp_path):
+        """Recording a fail result persists in state."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "implement", "--result", "fail",
+            "--output", "2 tests failed",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["result"] == "fail"
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        assert state["stages"]["implement"]["verify_result"] == "fail"
+
+    def test_multiple_attempts(self, tmp_path):
+        """Multiple record-verify calls increment attempt numbers."""
+        run_id = self._setup_run(tmp_path)
+        # First attempt: fail
+        run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "implement", "--result", "fail",
+            cwd=str(tmp_path),
+        )
+        # Second attempt: pass
+        r = run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "implement", "--result", "pass",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["attempt"] == 2
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        attempts = state["stages"]["implement"]["verify_attempts"]
+        assert len(attempts) == 2
+        assert attempts[0]["result"] == "fail"
+        assert attempts[1]["result"] == "pass"
+        # verify_result reflects the latest
+        assert state["stages"]["implement"]["verify_result"] == "pass"
+
+    def test_record_verify_nonexistent_stage(self, tmp_path):
+        """Recording verify for a stage not in state returns error."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-verify", "--run-id", run_id,
+            "--stage", "nonexistent", "--result", "pass",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+    def test_record_verify_nonexistent_run(self, tmp_path):
+        """Recording verify for a nonexistent run returns error."""
+        self._setup_run(tmp_path)
+        r = run_rt(
+            "record-verify", "--run-id", "99991231T999999Z",
+            "--stage", "implement", "--result", "pass",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Final verify plan
+# ---------------------------------------------------------------------------
+
+
+class TestFinalVerifyPlan:
+    def test_final_verify_from_config(self, tmp_path):
+        """Config with final_verify returns commands and policy."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+            "final_verify": ["python3 -m pytest -v", "ruff check ."],
+            "final_verify_policy": "block",
+            "final_verify_max_retries": 2,
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["commands"] == ["python3 -m pytest -v", "ruff check ."]
+        assert plan["policy"] == "block"
+        assert plan["max_retries"] == 2
+        assert plan["source"] == "config"
+        assert "cwd" in plan
+
+    def test_final_verify_auto_detected(self, tmp_path):
+        """Without final_verify config, auto-detects from repo signals."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        # Create a tests/ directory for auto-detection
+        (tmp_path / "tests").mkdir()
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["commands"] == ["python3 -m pytest -v"]
+        assert plan["source"] == "auto-detected"
+        assert plan["policy"] == "block"
+        assert "cwd" in plan
+
+    def test_final_verify_nothing_found(self, tmp_path):
+        """No config and no repo signals returns unverified policy."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["commands"] == []
+        assert plan["policy"] == "unverified"
+        assert plan["source"] == "none"
+        assert "cwd" not in plan
+
+    def test_final_verify_warn_policy(self, tmp_path):
+        """Config with policy=warn returns warn."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+            "final_verify": ["python3 -m pytest -v"],
+            "final_verify_policy": "warn",
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["policy"] == "warn"
+
+    def test_final_verify_single_command_string(self, tmp_path):
+        """A single string final_verify is normalized to a list."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+            "final_verify": "python3 -m pytest -v",
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["commands"] == ["python3 -m pytest -v"]
+        assert plan["source"] == "config"
+
+    def test_final_verify_defaults(self, tmp_path):
+        """Default policy is block and max_retries is 1 when not specified."""
+        config = {
+            "version": "1",
+            "pipeline": {"stages": []},
+            "final_verify": ["make test"],
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        r = run_rt("final-verify-plan", cwd=str(tmp_path))
+        assert r.returncode == 0
+        plan = json.loads(r.stdout)
+        assert plan["policy"] == "block"
+        assert plan["max_retries"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Record gate
+# ---------------------------------------------------------------------------
+
+
+class TestRecordGate:
+    def _setup_run(self, tmp_path):
+        """Create config with stages and init a run."""
+        config = {
+            "version": "1",
+            "pipeline": {
+                "stages": [
+                    {"name": "implement", "roles": ["dev"], "gate": "reviewer"},
+                    {"name": "design", "roles": ["architect"], "gate": "human"},
+                    {"name": "test", "roles": ["qa"], "gate": "auto"},
+                ]
+            },
+        }
+        config_path = tmp_path / "agenteam.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+        r = run_rt("init", "--task", "gate test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_record_gate_approved(self, tmp_path):
+        """Recording an approved gate persists in state."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-gate", "--run-id", run_id,
+            "--stage", "implement", "--gate-type", "reviewer",
+            "--result", "approved",
+            "--verdict", "PASS WITH WARNINGS: 2 WARN findings",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["recorded"] is True
+        assert result["result"] == "approved"
+        assert result["verdict"] == "PASS WITH WARNINGS: 2 WARN findings"
+
+        # Check state file
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        stage = state["stages"]["implement"]
+        assert stage["gate"] == "reviewer"
+        assert stage["gate_result"] == "approved"
+        assert stage["gate_agent"] == "reviewer"
+        assert stage["gate_verdict"] == "PASS WITH WARNINGS: 2 WARN findings"
+
+    def test_record_gate_rejected(self, tmp_path):
+        """Recording a rejected gate persists in state."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-gate", "--run-id", run_id,
+            "--stage", "implement", "--gate-type", "reviewer",
+            "--result", "rejected",
+            "--verdict", "BLOCK: missing error handling",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        assert state["stages"]["implement"]["gate_result"] == "rejected"
+
+    def test_record_gate_human(self, tmp_path):
+        """Human gate type does not set gate_agent."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-gate", "--run-id", run_id,
+            "--stage", "design", "--gate-type", "human",
+            "--result", "approved",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        stage = state["stages"]["design"]
+        assert stage["gate"] == "human"
+        assert stage["gate_result"] == "approved"
+        assert "gate_agent" not in stage
+
+    def test_record_gate_nonexistent_stage(self, tmp_path):
+        """Recording a gate for a nonexistent stage returns error."""
+        run_id = self._setup_run(tmp_path)
+        r = run_rt(
+            "record-gate", "--run-id", run_id,
+            "--stage", "nonexistent", "--gate-type", "auto",
+            "--result", "approved",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "not found" in r.stderr
+
+    def test_record_gate_nonexistent_run(self, tmp_path):
+        """Recording a gate for a nonexistent run returns error."""
+        self._setup_run(tmp_path)
+        r = run_rt(
+            "record-gate", "--run-id", "99991231T999999Z",
+            "--stage", "implement", "--gate-type", "reviewer",
+            "--result", "approved",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode != 0
+        assert "not found" in r.stderr

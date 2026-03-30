@@ -129,6 +129,15 @@ print('OK')
   [ "$status" -ne 0 ]
 }
 
+@test "verify-stage.sh exists and is executable" {
+  [ -x "$PLUGIN_DIR/scripts/verify-stage.sh" ]
+}
+
+@test "verify-stage.sh without args prints usage" {
+  run bash "$PLUGIN_DIR/scripts/verify-stage.sh" invalid-cmd
+  [ "$status" -ne 0 ]
+}
+
 @test "update.sh --local refreshes Codex plugin cache" {
   local tmp_home
   tmp_home="$(mktemp -d "${BATS_TEST_TMPDIR}/ateam-update-home.XXXXXX")"

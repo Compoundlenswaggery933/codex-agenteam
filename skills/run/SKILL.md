@@ -137,10 +137,38 @@ For each stage in the ordered stage list:
      - Gather each role's output
      - Store as context for subsequent stages
 
-  e. Gate check:
+  e. Verify stage (if configured):
+     - Get verify plan:
+       python3 <runtime>/agenteam_rt.py verify-plan <stage> --run-id <run_id>
+     - If verify is null: skip to gate check.
+     - Execute verification in the isolated workspace:
+       bash <plugin-dir>/scripts/verify-stage.sh run "<verify>" --cwd "<cwd>"
+     - Record result:
+       python3 <runtime>/agenteam_rt.py record-verify --run-id <run_id> \
+         --stage <stage> --result pass|fail --output "<output>"
+     - If passed: continue to gate check.
+     - If failed and attempts < max_retries:
+       Log "Verification failed (attempt N/max). Re-dispatching..."
+       Determine repair role(s):
+         * Single-role stage: re-dispatch that role
+         * Multi-role stage: match failing files to write_scope
+         * All-read-only stage: fail-fast to gate check (no repair possible)
+       Re-dispatch repair role(s) with failure output as context
+       Go back to verify
+     - If failed and attempts >= max_retries (or no legal repair role):
+       Log "Verification failed after N attempts. Pipeline stopped."
+       Show failure output to user. Do NOT advance.
+
+  f. Gate check:
      - If gate is "human": pause and show the user a summary of the
        stage output. Ask: "Approve this stage? (yes/no/details)"
+     - If gate is "reviewer" or "qa": dispatch the gate agent as a
+       SEPARATE subagent (never the stage actor). Parse verdict
+       (PASS/BLOCK). Record via record-gate. If BLOCK, pause for human.
      - If gate is "auto": continue to next stage
+     - Record gate result:
+       python3 <runtime>/agenteam_rt.py record-gate --run-id <run_id> \
+         --stage <stage> --gate-type <type> --result approved|rejected
 
   f. Handoff:
      - Pass the collected outputs as context to the next stage
@@ -153,6 +181,41 @@ For each stage in the ordered stage list:
 Do not mark the run complete after `implement`. Unless the user explicitly
 asks to stop early, continue through `test` and `review`, and surface the
 reviewer's findings before calling the pipeline done.
+
+### 6b. Final Verification (after the last configured stage)
+
+After all stages complete, run final verification:
+
+```
+1. Get final verify plan:
+   python3 <runtime>/agenteam_rt.py final-verify-plan --run-id <run_id>
+
+2. If policy is "unverified":
+   Print warning: "No final verification commands configured or detected.
+   AgenTeam cannot vouch for this run."
+   Skip to completion.
+
+3. Run each command in sequence:
+   bash <plugin-dir>/scripts/verify-stage.sh run "<command>" --cwd "<cwd>"
+
+4. If all pass: continue to completion.
+
+5. If any fail and retries remain:
+   Determine repair role(s) from failure context:
+     * Failing test files (tests/**) -> dispatch qa
+     * Failing source files (src/**) -> dispatch dev
+     * Both -> dispatch dev + qa
+     * Unclear -> dispatch dev as fallback
+   Re-dispatch repair role(s) with failure output
+   Re-run all final_verify commands
+
+6. If still failing:
+   block mode: mark run failed, keep branch open, print failure summary
+   warn mode: print "TESTS FAILING" warning, complete but do not suggest merge
+```
+
+This is non-negotiable. Final verification is the mechanism that lets
+AgenTeam vouch for its work. It runs AFTER the review stage, not before.
 
 ### 7. HOTL Wrapper Pipeline
 

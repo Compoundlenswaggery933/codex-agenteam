@@ -11,17 +11,17 @@ Set up AgenTeam for the current project.
 
 ### 1. Check Prerequisites
 
-Verify Python 3.8+ is available:
+Resolve the runtime path first, then use the runtime itself as the readiness check.
+Do not spend time on separate environment probes if the runtime command can tell
+you what is missing.
+
+Fast path:
 ```bash
-python3 --version
+python3 <plugin-dir>/runtime/agenteam_rt.py validate
 ```
 
-Check for required dependencies:
-```bash
-python3 -c "import yaml; import toml; print('OK')"
-```
-
-If dependencies are missing, offer to install:
+If Python or dependencies are missing, the runtime prints a JSON error. Only then
+offer the minimal install fix:
 ```bash
 pip install pyyaml toml
 ```
@@ -36,30 +36,27 @@ Look for `.agenteam/config.yaml` first, then legacy `agenteam.yaml`.
 
 ### 3. Create Config
 
-Copy the template and prompt for customization:
+Copy the template:
 
 ```bash
 mkdir -p .agenteam
 cp <plugin-dir>/templates/agenteam.yaml.template .agenteam/config.yaml
 ```
 
-Ask the user (one question at a time):
+Default to a fast setup unless the user explicitly asks to customize:
 
-1. **Team name:** "What should I name this team?" (default: project directory name)
-2. **Pipeline mode:**
-   - `standalone` — Built-in pipeline (design -> plan -> implement -> test -> review)
-   - `hotl` — Integrate with HOTL plugin for structured workflows
-   - `dispatch-only` — No pipeline, dispatch roles ad-hoc
-3. **Write scope customization:** "Do the default write scopes work?
-   (dev: src/**, lib/** | qa: tests/**, *.test.*)"
-4. **Custom roles:** "Do you want to add any custom roles? (e.g., security_auditor, docs_writer)"
+- Team name: use the project directory name
+- Pipeline mode: keep the template default unless the user asked for HOTL or dispatch-only
+- Write scopes: keep defaults unless the repo clearly needs different paths
+- Custom roles: do not ask up front; mention they can be added later with `$ateam:add-member`
 
-Update `.agenteam/config.yaml` (or the existing legacy `agenteam.yaml`) with the user's choices.
+Only ask follow-up questions when a decision is genuinely ambiguous or the user
+asked for a tailored team. Do not turn basic setup into a multi-question interview.
 
 ### 4. Validate Config
 
 ```bash
-python3 <plugin-dir>/runtime/agenteam_rt.py init --task "team initialization"
+python3 <plugin-dir>/runtime/agenteam_rt.py validate
 ```
 
 If validation fails, show the error and help the user fix it.
@@ -73,6 +70,9 @@ python3 <plugin-dir>/runtime/agenteam_rt.py generate
 This creates `.codex/agents/*.toml` for each role. Show the user what was generated.
 
 ### 6. HOTL Detection
+
+Only do this if it changes the recommendation you will give the user. Skip it for
+simple setup if the team is already ready to use.
 
 ```bash
 python3 <plugin-dir>/runtime/agenteam_rt.py hotl check
@@ -95,4 +95,11 @@ Show:
 
 Resolve the AgenTeam runtime:
 1. If running from the plugin directory: `./runtime/agenteam_rt.py`
-2. If installed as a Codex plugin: `<plugin-install-path>/runtime/agenteam_rt.py`
+2. If installed as a Codex plugin cache entry: `<plugin-install-path>/local/runtime/agenteam_rt.py`
+
+## Performance Guardrails
+
+- Prefer the shortest successful path: create config, validate, generate, show roster.
+- Avoid unrelated repo exploration during first-time setup.
+- Do not create a dummy run just to validate config.
+- A normal first-time setup should usually take a few seconds, not minutes.

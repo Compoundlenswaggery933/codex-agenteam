@@ -17,11 +17,20 @@ Check if `.agenteam/config.yaml` (or legacy `agenteam.yaml`) exists in the proje
 **If missing**, initialize immediately:
 
 ```bash
-PLUGIN_DIR="$(find ~/.codex/plugins/cache -name 'ateam' -type d 2>/dev/null | head -1)"
+PLUGIN_DIR="$(find ~/.codex/plugins/cache -path '*/ateam/local' -type d 2>/dev/null | head -1)"
 mkdir -p .agenteam
 cp "$PLUGIN_DIR/templates/agenteam.yaml.template" .agenteam/config.yaml
 python3 "$PLUGIN_DIR/runtime/agenteam_rt.py" generate
 ```
+
+Keep auto-init on the fast path:
+
+- Do not inspect unrelated files before creating the default config.
+- Do not ask setup questions unless the user asked for customization.
+- Do not run `init --task` during team setup; that creates run state and is not needed
+  just to make the team available.
+- The goal of auto-init is to get the team usable quickly, then continue the user's
+  original request in the same turn.
 
 Then decide what to do next:
 

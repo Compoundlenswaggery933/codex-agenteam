@@ -14,6 +14,8 @@ from .generate import cmd_generate
 from .hotl import cmd_health, cmd_hotl_check
 from .standup import cmd_standup
 from .state import cmd_init, cmd_status
+from .validate import cmd_validate
+from .verify import cmd_final_verify_plan, cmd_record_gate, cmd_record_verify, cmd_verify_plan
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # generate
     sub.add_parser("generate", help="Generate .codex/agents/*.toml")
+
+    # validate
+    sub.add_parser("validate", help="Validate config without creating run state")
 
     # dispatch
     p_dispatch = sub.add_parser("dispatch", help="Generate dispatch plan for a stage")
@@ -83,6 +88,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include dispatch_mode=true for deepdive skill",
     )
 
+    # verify-plan
+    p_verify_plan = sub.add_parser("verify-plan", help="Get verification plan for a stage")
+    p_verify_plan.add_argument("stage", help="Stage name")
+    p_verify_plan.add_argument("--run-id", dest="run_id", default=None)
+
+    # record-verify
+    p_record_verify = sub.add_parser("record-verify", help="Record a verification result")
+    p_record_verify.add_argument("--run-id", dest="run_id", required=True)
+    p_record_verify.add_argument("--stage", required=True)
+    p_record_verify.add_argument("--result", required=True, choices=["pass", "fail"])
+    p_record_verify.add_argument("--output", default="")
+
+    # final-verify-plan
+    p_final_verify = sub.add_parser("final-verify-plan", help="Get final verification plan")
+    p_final_verify.add_argument("--run-id", dest="run_id", default=None)
+
+    # record-gate
+    p_record_gate = sub.add_parser("record-gate", help="Record a gate decision")
+    p_record_gate.add_argument("--run-id", dest="run_id", required=True)
+    p_record_gate.add_argument("--stage", required=True)
+    p_record_gate.add_argument("--gate-type", dest="gate_type", required=True)
+    p_record_gate.add_argument("--result", required=True, choices=["approved", "rejected"])
+    p_record_gate.add_argument("--verdict", default="")
+
     return parser
 
 
@@ -129,6 +158,8 @@ def main() -> None:
         cmd_init(args, config)
     elif args.command == "generate":
         cmd_generate(args, config)
+    elif args.command == "validate":
+        cmd_validate(args, config)
     elif args.command == "dispatch":
         cmd_dispatch(args, config)
     elif args.command == "status":
@@ -147,6 +178,14 @@ def main() -> None:
         else:
             print(json.dumps({"error": "Unknown roles subcommand"}), file=sys.stderr)
             sys.exit(1)
+    elif args.command == "verify-plan":
+        cmd_verify_plan(args, config)
+    elif args.command == "record-verify":
+        cmd_record_verify(args, config)
+    elif args.command == "final-verify-plan":
+        cmd_final_verify_plan(args, config)
+    elif args.command == "record-gate":
+        cmd_record_gate(args, config)
     else:
         parser.print_help()
         sys.exit(1)

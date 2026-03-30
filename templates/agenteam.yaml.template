@@ -6,6 +6,13 @@ version: "1"
 # --- Force HOTL execution (auto-detected when omitted) ---
 # pipeline: hotl
 
+# --- Final verification (runs after all stages) ---
+# Auto-detected from repo signals when omitted (pytest, npm test, etc.)
+final_verify:
+  - "python3 -m pytest -v"
+# final_verify_policy: block   # block (default) | warn
+# final_verify_max_retries: 1
+
 # --- Role overrides (deep-merged with built-in defaults) ---
 roles:
   dev:
@@ -31,7 +38,9 @@ roles:
   #   system_instructions: |
   #     Focus on OWASP top 10, auth/authz logic, and hardcoded secrets.
 
-# --- Pipeline stages (omit for ad-hoc dispatch only) ---
+# --- Pipeline stages ---
+# verify: shell command that must exit 0 (auto-detected when omitted)
+# max_retries: re-dispatch on verify failure (default: 0)
 pipeline:
   stages:
     - name: research
@@ -45,6 +54,7 @@ pipeline:
     - name: design
       roles: [architect, pm, researcher]
       gate: human
+      verify: "test -f docs/designs/*.md"
 
     - name: plan
       roles: [dev]
@@ -53,10 +63,12 @@ pipeline:
     - name: implement
       roles: [dev]
       gate: auto
+      max_retries: 2
 
     - name: test
       roles: [qa]
       gate: auto
+      max_retries: 1
 
     - name: review
       roles: [reviewer]

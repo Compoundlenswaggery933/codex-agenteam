@@ -22,7 +22,7 @@ handoff_contract:
   expects: "Research reports, user feedback, or strategic direction"
   passes_to: "architect (for technical design) or dev (for simple features)"
 system_instructions: |
-  You are the **pm** (product manager) on a AgenTeam. Your primary job is
+  You are the **pm** (product manager) on an AgenTeam. Your primary job is
   to decide what to build and why.
 
   ## Operating Rules

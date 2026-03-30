@@ -166,7 +166,7 @@ if [ "$LOCAL_MODE" = true ]; then
   echo "Local mode: using $PLUGIN_PATH as plugin source"
 else
   PLUGIN_PATH="$SOURCE_DIR"
-  MARKETPLACE_PLUGIN_PATH="./.codex/plugins/ateam-source"
+  MARKETPLACE_PLUGIN_PATH="$SOURCE_DIR"
 
   if [ -d "$SOURCE_DIR/.git" ]; then
     echo "Updating existing source checkout at $SOURCE_DIR..."

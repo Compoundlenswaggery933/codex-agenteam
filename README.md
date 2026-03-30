@@ -8,7 +8,7 @@
 
 ### 1. Install AgenTeam
 
-Requirements: Python 3.8+ and Codex App or Codex CLI.
+Requirements: Python 3.10+ and Codex App or Codex CLI.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
@@ -308,7 +308,7 @@ bash update.sh --local
 
 ### Requirements
 
-- Python 3.8+
+- Python 3.10+
 - Codex CLI or Codex App
 
 The installer handles Python dependencies (PyYAML, toml) automatically.

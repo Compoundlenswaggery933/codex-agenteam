@@ -39,9 +39,28 @@ ROLES_DIR = PLUGIN_DIR / "roles"
 # Config loading & validation
 # ---------------------------------------------------------------------------
 
-def find_config(directory: str | None = None) -> Path:
-    """Locate config: .agenteam/config.yaml (preferred) or agenteam.yaml (legacy)."""
-    d = Path(directory) if directory else Path.cwd()
+def find_config(path_or_dir: str | None = None) -> Path:
+    """Locate config file. Accepts a direct file path or a directory to search."""
+    if path_or_dir:
+        p = Path(path_or_dir)
+        # If it's a file path, use it directly
+        if p.is_file():
+            return p
+        # If it's a directory, search within it
+        if p.is_dir():
+            preferred = p / ".agenteam" / "config.yaml"
+            if preferred.exists():
+                return preferred
+            legacy = p / "agenteam.yaml"
+            if legacy.exists():
+                return legacy
+            raise FileNotFoundError(
+                f"Config not found in {p}. Expected .agenteam/config.yaml or agenteam.yaml"
+            )
+        raise FileNotFoundError(f"Config path does not exist: {p}")
+
+    # Default: search current directory
+    d = Path.cwd()
     preferred = d / ".agenteam" / "config.yaml"
     if preferred.exists():
         return preferred
@@ -337,6 +356,7 @@ def cmd_dispatch(args, config: dict) -> None:
 
     dispatch_list = []
     blocked = []
+    serial_lock_granted = active_lock  # Track who holds the lock
 
     for rname in role_names:
         role = roles.get(rname, {"name": rname})
@@ -352,10 +372,13 @@ def cmd_dispatch(args, config: dict) -> None:
         }
 
         if can_write and write_mode == "serial":
-            if active_lock and active_lock != rname:
+            if serial_lock_granted and serial_lock_granted != rname:
+                # Another writer already holds the lock
                 blocked.append(entry)
                 continue
+            # Grant lock to this writer (first writer wins)
             entry["write_lock"] = True
+            serial_lock_granted = rname
 
         dispatch_list.append(entry)
 

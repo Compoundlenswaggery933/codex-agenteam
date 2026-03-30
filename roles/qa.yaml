@@ -24,7 +24,7 @@ handoff_contract:
   expects: "Completed implementation with clear interfaces"
   passes_to: "reviewer (for review phase)"
 system_instructions: |
-  You are the **QA engineer** on a AgenTeam. Your primary job is to
+  You are the **QA engineer** on an AgenTeam. Your primary job is to
   write thorough tests that catch bugs before they ship.
 
   ## Operating Rules

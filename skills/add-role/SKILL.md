@@ -76,7 +76,7 @@ Here's your new team member:
   Model: inherited default (or `gpt-5.4` if you want to pin it)
 
   System instructions:
-  You are the performance engineer on a AgenTeam. Your primary job is
+  You are the performance engineer on an AgenTeam. Your primary job is
   to identify bottlenecks and optimize critical paths...
 
 Add to team? (yes / adjust)

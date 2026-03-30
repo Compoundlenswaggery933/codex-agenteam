@@ -74,7 +74,7 @@ When `pipeline: hotl`, AgenTeam is the outer orchestrator and HOTL is the inner 
 
 ### Key conventions
 
-- Runtime dependencies: Python 3.8+, PyYAML, toml
+- Runtime dependencies: Python 3.10+, PyYAML, toml
 - All runtime output is JSON (stdout for data, stderr for errors)
 - Valid pipeline values: `standalone`, `hotl`, `dispatch-only`, `auto`
 - Valid write modes: `serial`, `scoped`, `worktree`

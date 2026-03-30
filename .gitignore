@@ -19,6 +19,7 @@ hotl-workflow*.md
 docs/plans/
 docs/designs/
 docs/strategies/
+docs/research/
 CLAUDE.md
 
 # Lore runtime data (user-specific, not repo content)

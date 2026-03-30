@@ -264,6 +264,26 @@ as a write_scope violation from a writing role.
 }
 ```
 
+## Safety Invariants
+
+Two non-negotiable rules that the entire scoped parallel model depends on:
+
+**1. The skill (controller), not the subagents, performs commit capture.**
+Subagents write files in parallel but never run `git add` or `git commit`.
+After all subagents in a group complete, the skill serializes per-role
+commit capture: for each writing role, `git add` only files matching that
+role's `write_scope`, then `git commit -m "[ateam:<role>] ..."`. This
+guarantees clean provenance -- every commit is from exactly one role,
+created by the controller from a known-good index state.
+
+**2. The audit must reject any unattributed working-tree changes.**
+After the serialized commit capture, the skill runs `git status --porcelain`.
+If ANY modified, untracked, or staged files remain, the audit fails. These
+are files that no role's `write_scope` claimed -- they may be from a
+read-only agent writing accidentally, a writing agent going outside scope,
+or an external process. Unattributed changes are never silently accepted.
+The stage is tainted and falls back to serial execution.
+
 ## Serial Fallback
 
 ### Baseline safety

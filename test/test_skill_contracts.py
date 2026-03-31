@@ -52,11 +52,10 @@ def test_researcher_role_has_citation_format():
     assert "[Title](URL)" in text
 
 
-def test_assign_skill_passes_handoff_and_verify_context():
+def test_assign_skill_passes_handoff_and_role_context():
     text = read_skill("skills/assign/SKILL.md")
     assert "roles show <role-name>" in text
-    assert "handoff_contract" in text
-    assert "verify command" in text
+    assert "handoff" in text
 
 
 def test_init_skill_prefers_validate_over_dummy_init():

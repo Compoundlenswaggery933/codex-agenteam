@@ -32,6 +32,33 @@ def test_run_skill_requires_real_dispatch_and_full_pipeline():
     assert "Do not mark the run complete after `implement`." in text
 
 
+def test_run_skill_requires_dynamic_role_context_injection():
+    text = read_skill("skills/run/SKILL.md")
+    assert "Build a role-context block" in text
+    assert "verify-plan" in text
+    assert "roles show <role>" in text
+    assert "handoff_contract" in text
+
+
+def test_run_skill_requires_hotl_aware_artifact_discovery():
+    text = read_skill("skills/run/SKILL.md")
+    assert "artifact-paths" in text
+    assert "Do NOT hardcode directory paths" in text
+
+
+def test_researcher_role_has_citation_format():
+    text = (ROOT / "roles" / "researcher.yaml").read_text()
+    assert "Citation Format" in text
+    assert "[Title](URL)" in text
+
+
+def test_assign_skill_passes_handoff_and_verify_context():
+    text = read_skill("skills/assign/SKILL.md")
+    assert "roles show <role-name>" in text
+    assert "handoff_contract" in text
+    assert "verify command" in text
+
+
 def test_init_skill_prefers_validate_over_dummy_init():
     text = read_skill("skills/init/SKILL.md")
     assert "python3 <plugin-dir>/runtime/agenteam_rt.py validate" in text

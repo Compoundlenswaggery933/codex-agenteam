@@ -353,6 +353,17 @@ the run ID or stage list. Once you have the run state, continue
 immediately into stage dispatch unless blocked by a human gate, an error,
 or an explicit user stop request.
 
+**Pipeline start banner (always show):**
+
+After capturing the run state, announce:
+
+```
+Pipeline started: "<task description>"
+Profile: <profile name or "full"> | Stages: <comma-separated stage names>
+```
+
+This gives the user immediate confirmation of what's about to happen.
+
 ### 5. Determine Pipeline Mode
 
 Read `pipeline_mode` from the run state:
@@ -402,6 +413,31 @@ For each stage in the ordered stage list:
      python3 <runtime>/agenteam_rt.py transition --run-id <run_id> \
        --stage <stage> --to dispatched
      ```
+
+  b3. Announce stage start to user:
+
+     Format: "[N/total] Assigning @Role to <verb>..."
+
+     Use the stage name to select the verb:
+     | Stage     | Verb |
+     |-----------|------|
+     | research  | "investigate" |
+     | strategy  | "define strategy" |
+     | design    | "design the solution" |
+     | plan      | "write the implementation plan" |
+     | implement | "implement the design" |
+     | test      | "write tests" |
+     | review    | "review the implementation" |
+
+     For custom stage names not in this table, use the stage name as the verb.
+
+     Adjust numbering to the actual stage count (profiles may skip stages).
+     Use the stage's assigned role name from the dispatch plan.
+
+     If a human gate is upcoming at this stage, append:
+     "(approval required after this stage)"
+
+     Example: "[3/5] Assigning @Dev to implement the design..."
 
   c0. Check HOTL skill eligibility (before launching any subagent):
 
@@ -497,6 +533,27 @@ For each stage in the ordered stage list:
      - Gather each role's output
      - Store as context for subsequent stages
 
+  d3. Announce stage completion to user:
+
+     On success:
+       "@Role completed <stage> -- <one-line outcome summary>. <forward reference>"
+
+     Examples:
+       "@Researcher completed research -- report on auth patterns written to docs/research/. @Pm strategizes next."
+       "@Architect completed design -- OAuth2+PKCE recommended, 3 approaches documented. @Dev implements next."
+       "@Dev completed implement -- added 4 files in src/auth/, 230 lines. @Qa tests next."
+       "@Qa completed test -- 12 tests added, all passing. @Reviewer reviews next."
+       "@Reviewer completed review -- PASS, no blocking findings."
+
+     On failure:
+       "@Role failed at <stage> -- <one-line failure reason>"
+
+     Rules:
+     - One line per stage, outcome-shaped
+     - Include artifact paths or counts when available
+     - Include forward reference to next stage's role (except for the final stage)
+     - Never dump raw output, diffs, or full test logs
+
   e. Verify stage (if configured):
      - Get verify plan:
        python3 <runtime>/agenteam_rt.py verify-plan <stage> --run-id <run_id>
@@ -586,7 +643,9 @@ For each stage in the ordered stage list:
      **Gate evaluation (when gate is not "auto"):**
      - python3 <runtime>/agenteam_rt.py transition --run-id <run_id> \
          --stage <stage> --to gated
-     - If gate is "human": pause and show the user a summary of the
+     - If gate is "human":
+       Announce: "Waiting for your approval at the <stage> gate."
+       Pause and show the user a summary of the
        stage output. Ask: "Approve this stage? (yes/no/details)"
      - If gate is "reviewer" or "qa": dispatch the gate agent as a
        SEPARATE subagent (never the stage actor). Parse verdict
@@ -730,6 +789,9 @@ Only after the final configured stage completes:
   python3 <runtime>/agenteam_rt.py event append --run-id <run_id> \
     --type run_finished --data '{"status": "completed"}'
   ```
+- Announce pipeline result:
+  On success: `Pipeline complete: <N>/<N> stages passed.`
+  On failure: `Pipeline stopped at <stage>: <reason>. Completed <N>/<total> stages.`
 - Show a summary of what each role produced
 - Show the final state: `python3 <runtime>/agenteam_rt.py status`
 - Suggest next steps (commit, create PR, etc.)

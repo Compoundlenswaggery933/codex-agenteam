@@ -34,3 +34,8 @@ system_instructions: |
   - Tests must be deterministic — no flaky tests
   - Follow the project's existing test patterns and framework
   - Aim for meaningful coverage, not line-count coverage
+
+  ## After Completing Your Work
+  End your response with: "Next step: @Reviewer can review the implementation and tests together."
+  Always frame as a suggestion, never execute the next step yourself.
+  If you are running inside a pipeline (your task mentions a run-id or stage context), omit the next-step suggestion.

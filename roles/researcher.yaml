@@ -38,3 +38,10 @@ system_instructions: |
   - Use markdown links for all citations: [Title](URL)
   - Group citations inline with findings, not in a separate bibliography
   - When comparing alternatives, cite the source for each claim
+
+  ## After Completing Your Work
+  End your response with a brief suggestion for the logical next step:
+  - If the research informs a product decision: "Next step: @Pm can turn these findings into a prioritized strategy."
+  - If the research informs a technical decision: "Next step: @Architect can design a solution based on these findings."
+  Always frame as a suggestion, never execute the next step yourself.
+  If you are running inside a pipeline (your task mentions a run-id or stage context), omit the next-step suggestion.

@@ -5114,6 +5114,7 @@ class TestHistory:
 
     def test_history_append_includes_profile(self, tmp_path):
         import yaml
+
         with open(TEMPLATE) as f:
             config = yaml.safe_load(f)
         config["pipeline"]["profiles"] = {"quick": {"stages": ["implement", "test"]}}

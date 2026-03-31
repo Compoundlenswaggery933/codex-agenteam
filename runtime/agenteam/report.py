@@ -116,11 +116,13 @@ def _extract_lessons(run_id: str, summary: dict, state: dict) -> dict:
     for stage in summary.get("stages", []):
         verify = stage.get("verify")
         if verify and (verify.get("attempts", 1) > 1 or verify.get("result") == "fail"):
-            verify_failures.append({
-                "stage": stage["name"],
-                "attempts": verify.get("attempts", 1),
-                "final_result": verify.get("result", "unknown"),
-            })
+            verify_failures.append(
+                {
+                    "stage": stage["name"],
+                    "attempts": verify.get("attempts", 1),
+                    "final_result": verify.get("result", "unknown"),
+                }
+            )
 
     # Rework edges: from the run summary's rework_history
     rework_edges = []
@@ -136,24 +138,30 @@ def _extract_lessons(run_id: str, summary: dict, state: dict) -> dict:
     gate_rejections = []
     for stage_name, stage_state in state.get("stages", {}).items():
         if stage_state.get("gate_result") == "rejected":
-            gate_rejections.append({
-                "stage": stage_name,
-                "gate_type": stage_state.get("gate", "unknown"),
-            })
+            gate_rejections.append(
+                {
+                    "stage": stage_name,
+                    "gate_type": stage_state.get("gate", "unknown"),
+                }
+            )
 
     # Gate overrides: from state stages where gate_type == "criteria_override"
     gate_overrides = []
     for stage_name, stage_state in state.get("stages", {}).items():
         if stage_state.get("gate_type") == "criteria_override":
-            gate_overrides.append({
-                "stage": stage_name,
-                "criteria_failed": stage_state.get("criteria_failed", []),
-                "override_reason": stage_state.get("override_reason", ""),
-            })
+            gate_overrides.append(
+                {
+                    "stage": stage_name,
+                    "criteria_failed": stage_state.get("criteria_failed", []),
+                    "override_reason": stage_state.get("override_reason", ""),
+                }
+            )
 
     # Final verify: check if all passed
     final_results = state.get("final_verify_results", [])
-    final_verify_passed = all(r.get("result") == "pass" for r in final_results) if final_results else True
+    final_verify_passed = (
+        all(r.get("result") == "pass" for r in final_results) if final_results else True
+    )
 
     # Stage counts
     stages = state.get("stages", {})

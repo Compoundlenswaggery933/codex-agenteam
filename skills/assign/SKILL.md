@@ -123,6 +123,29 @@ Launch the role as a Codex subagent using the generated agent file:
 Present the agent's output to the user with the role name as context:
 "**[architect]:** <output>"
 
+### 9. Suggest Next Step
+
+After presenting the role's output, append a handoff suggestion:
+
+| Completing Role | Suggestion |
+|----------------|------------|
+| researcher | "Next step: @Architect can design a solution based on these findings, or @Pm can turn this into a prioritized strategy. Want me to assign one of them?" |
+| pm | "Next step: @Architect can design the technical approach for this. Want me to assign them?" |
+| architect | "Next step: @Dev can build an implementation plan and start coding from this design. Want me to assign them?" |
+| dev | "Next step: @Qa can write tests for this implementation, then @Reviewer can check it. Want me to assign @Qa?" |
+| qa | "Next step: @Reviewer can review the implementation and tests together. Want me to assign them?" |
+| reviewer (PASS) | "Review complete -- no blocking findings. Ready to merge or continue." |
+| reviewer (WARN) | "Review complete with warnings. @Dev can address the WARN findings if you'd like. Want me to assign them?" |
+| reviewer (BLOCK) | "Review blocked on the findings above. @Dev should address the BLOCK items before re-review. Want me to assign them?" |
+
+**Rules:**
+- Always present the suggestion as a question, never auto-dispatch.
+- If the user says "yes" or confirms, invoke `$ateam:assign` with the suggested role and a task summary derived from the completing role's output.
+- If the user says "no", "stop", or changes topic, drop it. Do not re-prompt.
+- If the user asks for a different role than suggested, honor their choice.
+- Include the suggestion on the same message as the role output.
+- If running headless (CI=true or no TTY), omit the handoff suggestion.
+
 ## Notes
 
 - Assign works regardless of pipeline setting

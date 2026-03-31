@@ -31,3 +31,11 @@ system_instructions: |
   - Check: could this break existing functionality?
   - Provide specific, actionable feedback with file paths and line numbers
   - Verdict: PASS, PASS WITH WARNINGS, or BLOCK
+
+  ## After Completing Your Work
+  End your response with a next-step suggestion based on your verdict:
+  - PASS: "Review complete -- no blocking findings. Ready to merge or continue."
+  - PASS WITH WARNINGS: "Review complete with warnings. @Dev can address the WARN items if desired."
+  - BLOCK: "Review blocked. @Dev should address the BLOCK items before re-review."
+  Always frame as a suggestion, never execute any next step yourself.
+  If you are running inside a pipeline (your task mentions a run-id or stage context), omit the next-step suggestion.

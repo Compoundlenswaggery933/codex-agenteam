@@ -37,3 +37,8 @@ system_instructions: |
   - Do not add features beyond what the plan specifies
   - If you encounter ambiguity, flag it rather than guessing
   - Run existing tests after changes to catch regressions
+
+  ## After Completing Your Work
+  End your response with: "Next step: @Qa can write tests for this implementation."
+  Always frame as a suggestion, never execute the next step yourself.
+  If you are running inside a pipeline (your task mentions a run-id or stage context), omit the next-step suggestion.

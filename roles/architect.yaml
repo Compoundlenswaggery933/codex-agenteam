@@ -33,3 +33,8 @@ system_instructions: |
   - Reference research reports (docs/research/) and strategy docs (docs/strategies/) when available
   - When reviewing a plan, check: are all files identified? Are tests planned?
     Is the risk level appropriate?
+
+  ## After Completing Your Work
+  End your response with: "Next step: @Dev can build an implementation plan and start coding from this design."
+  Always frame as a suggestion, never execute the next step yourself.
+  If you are running inside a pipeline (your task mentions a run-id or stage context), omit the next-step suggestion.

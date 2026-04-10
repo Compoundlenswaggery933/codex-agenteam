@@ -72,6 +72,14 @@ def _build_run_summary(run_id: str) -> dict:
         if baseline:
             stage_entry["baseline"] = baseline
 
+        # Skip info
+        skip_reason = stage_state.get("skip_reason")
+        if skip_reason:
+            stage_entry["skip_reason"] = skip_reason
+        skipped_at = stage_state.get("skipped_at")
+        if skipped_at:
+            stage_entry["skipped_at"] = skipped_at
+
         stages_summary.append(stage_entry)
 
     # Rework history: extract from verify_attempts across all stages
@@ -168,11 +176,23 @@ def _extract_lessons(run_id: str, summary: dict, state: dict) -> dict:
     total_stages = len(stages)
     completed_stages = sum(1 for s in stages.values() if s.get("status") == "completed")
 
+    # Skipped stages
+    skipped_stages = []
+    for stage_name, stage_state in stages.items():
+        if stage_state.get("status") == "skipped":
+            skipped_stages.append(
+                {
+                    "stage": stage_name,
+                    "reason": stage_state.get("skip_reason", ""),
+                }
+            )
+
     return {
         "verify_failures": verify_failures,
         "rework_edges": rework_edges,
         "gate_rejections": gate_rejections,
         "gate_overrides": gate_overrides,
+        "skipped_stages": skipped_stages,
         "final_verify_passed": final_verify_passed,
         "total_stages": total_stages,
         "completed_stages": completed_stages,

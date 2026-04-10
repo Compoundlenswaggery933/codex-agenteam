@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Valid state transitions per the v2.3 design doc.
 VALID_TRANSITIONS: dict[str, set[str]] = {
-    "pending": {"dispatched"},
+    "pending": {"dispatched", "skipped"},
     "dispatched": {"verifying", "passed", "completed"},
     "verifying": {"passed", "failed"},
     "passed": {"gated", "completed"},
@@ -15,8 +15,9 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "failed": {"dispatched", "rework"},
     "rework": {"dispatched"},
     "rejected": {"dispatched"},
-    # Terminal: completed has no outgoing transitions.
+    # Terminal: completed and skipped have no outgoing transitions.
     "completed": set(),
+    "skipped": set(),
 }
 
 # Backward compatibility: map v2.2 status values to v2.3 equivalents.

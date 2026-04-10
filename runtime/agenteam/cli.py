@@ -25,7 +25,7 @@ from .migrate import cmd_migrate
 from .report import cmd_history_append, cmd_history_list, cmd_run_report
 from .resume import cmd_resume_detect, cmd_resume_plan
 from .standup import cmd_standup
-from .state import cmd_init, cmd_stage_baseline, cmd_status, validate_run_id
+from .state import cmd_init, cmd_stage_baseline, cmd_status, set_stage_field, validate_run_id
 from .transitions import cmd_transition
 from .validate import cmd_validate
 from .verify import cmd_final_verify_plan, cmd_record_gate, cmd_record_verify, cmd_verify_plan
@@ -165,6 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_stage_baseline.add_argument("--run-id", dest="run_id", required=True)
     p_stage_baseline.add_argument("--stage", required=True)
     p_stage_baseline.add_argument("--action", required=True, choices=["capture", "rollback"])
+
+    # set-stage-field
+    p_ssf = sub.add_parser("set-stage-field", help="Set an arbitrary field on a stage in state")
+    p_ssf.add_argument("--run-id", dest="run_id", required=True)
+    p_ssf.add_argument("--stage", required=True)
+    p_ssf.add_argument("--field", required=True)
+    p_ssf.add_argument("--value", required=True)
 
     # run-report
     p_run_report = sub.add_parser("run-report", help="Assemble run report from state")
@@ -343,6 +350,9 @@ def main() -> None:
         cmd_record_gate(args, config)
     elif args.command == "stage-baseline":
         cmd_stage_baseline(args, config)
+    elif args.command == "set-stage-field":
+        set_stage_field(args.run_id, args.stage, args.field, args.value)
+        print(json.dumps({"updated": True, "stage": args.stage, "field": args.field}))
     elif args.command == "run-report":
         cmd_run_report(args, config)
     elif args.command == "gate-eval":

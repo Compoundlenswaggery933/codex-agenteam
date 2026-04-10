@@ -63,7 +63,9 @@ def discoverable_state(run_id: str, **overrides) -> dict:
     return state
 
 
-def write_history_entry(tmp_path: Path, run_id: str, lessons: dict, task: str = "prior task") -> None:
+def write_history_entry(
+    tmp_path: Path, run_id: str, lessons: dict, task: str = "prior task"
+) -> None:
     """Write a synthetic history entry for visible-memory tests."""
     history_dir = tmp_path / ".agenteam" / "history"
     history_dir.mkdir(parents=True, exist_ok=True)

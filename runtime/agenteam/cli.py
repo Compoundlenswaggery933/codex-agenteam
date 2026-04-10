@@ -82,7 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
     # status
     p_status = sub.add_parser("status", help="Show run status")
     p_status.add_argument("run_id", nargs="?", default=None)
-    p_status.add_argument("--progress", action="store_true", default=False, help="Compact progress view")
+    p_status.add_argument(
+        "--progress",
+        action="store_true",
+        default=False,
+        help="Compact progress view",
+    )
 
     # policy
     p_policy = sub.add_parser("policy", help="Policy commands")

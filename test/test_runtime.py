@@ -6076,7 +6076,16 @@ class TestTransitionTimestamps:
 
     def test_transition_to_dispatched_sets_started_at(self, tmp_path):
         run_id = self._init_run(tmp_path)
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "dispatched",
+            cwd=str(tmp_path),
+        )
         state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
         with open(state_path) as f:
             state = json.load(f)
@@ -6085,7 +6094,16 @@ class TestTransitionTimestamps:
 
     def test_transition_to_dispatched_advances_current_stage(self, tmp_path):
         run_id = self._init_run(tmp_path)
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "dispatched",
+            cwd=str(tmp_path),
+        )
         state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
         with open(state_path) as f:
             state = json.load(f)
@@ -6093,8 +6111,26 @@ class TestTransitionTimestamps:
 
     def test_transition_to_completed_sets_completed_at(self, tmp_path):
         run_id = self._init_run(tmp_path)
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "completed", cwd=str(tmp_path))
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "dispatched",
+            cwd=str(tmp_path),
+        )
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "completed",
+            cwd=str(tmp_path),
+        )
         state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
         with open(state_path) as f:
             state = json.load(f)
@@ -6110,7 +6146,16 @@ class TestStatusProgress:
 
     def test_status_progress_returns_compact_view(self, tmp_path):
         run_id = self._init_run(tmp_path)
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "dispatched",
+            cwd=str(tmp_path),
+        )
         r = run_rt("status", run_id, "--progress", cwd=str(tmp_path))
         assert r.returncode == 0
         result = json.loads(r.stdout)
@@ -6138,8 +6183,26 @@ class TestStatusProgress:
 
     def test_status_progress_stage_elapsed(self, tmp_path):
         run_id = self._init_run(tmp_path)
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
-        run_rt("transition", "--run-id", run_id, "--stage", "implement", "--to", "completed", cwd=str(tmp_path))
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "dispatched",
+            cwd=str(tmp_path),
+        )
+        run_rt(
+            "transition",
+            "--run-id",
+            run_id,
+            "--stage",
+            "implement",
+            "--to",
+            "completed",
+            cwd=str(tmp_path),
+        )
         r = run_rt("status", run_id, "--progress", cwd=str(tmp_path))
         assert r.returncode == 0
         result = json.loads(r.stdout)
@@ -6162,6 +6225,6 @@ class TestEventTail:
 
         r = run_rt("event", "tail", "--run-id", "test-tail", cwd=str(tmp_path))
         assert r.returncode == 0
-        lines = [l for l in r.stdout.strip().split("\n") if l]
+        lines = [line for line in r.stdout.strip().split("\n") if line]
         assert len(lines) == 3
         assert "run_finished" in lines[-1]

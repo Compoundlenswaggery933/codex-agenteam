@@ -392,6 +392,41 @@ For each stage in the ordered stage list:
       python3 <runtime>/agenteam_rt.py stage-baseline --run-id <run_id> \
         --stage <stage> --action capture
 
+  a1. Check if stage should be skipped (docs-only pre-dispatch skip):
+
+     After a writing stage completes and before dispatching the next
+     stage, check whether the changes warrant the upcoming stage:
+
+     1. Get changed files since baseline:
+        ```bash
+        git diff --name-only <baseline>
+        ```
+     2. Classify: **docs-only** if ALL files match `docs/**`, `*.md`,
+        `README*`, `CHANGELOG*`, `LICENSE*`, `.gitignore`.
+        Otherwise: **code-or-config**.
+     3. If next stage is `test` AND change set is docs-only:
+        - Transition: `pending → skipped`
+          ```bash
+          python3 <runtime>/agenteam_rt.py transition --run-id <run_id> \
+            --stage <stage> --to skipped
+          python3 <runtime>/agenteam_rt.py set-stage-field --run-id <run_id> \
+            --stage <stage> --field skip_reason --value "docs_only_change"
+          python3 <runtime>/agenteam_rt.py set-stage-field --run-id <run_id> \
+            --stage <stage> --field skipped_at --value "<ISO timestamp>"
+          python3 <runtime>/agenteam_rt.py event append --run-id <run_id> \
+            --type stage_completed --stage <stage> \
+            --data '{"result": "skipped", "reason": "docs_only_change"}'
+          ```
+        - Announce: "⊘ Skipping test stage (docs-only change, no tests needed)"
+        - Continue to next stage (review) or completion
+     4. Otherwise: dispatch normally (continue to step a below)
+
+     **Rules:**
+     - Never skip `implement` or `review` stages
+     - Never skip in collaborative discovery mode
+     - Only skip `test` stage, only for docs-only changes
+     - Config files (*.yaml, *.toml, *.json) are NOT docs-only
+
   a. Get dispatch plan:
      python3 <runtime>/agenteam_rt.py dispatch <stage> \
        --task "<task>" --run-id <run_id>

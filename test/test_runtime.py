@@ -5487,3 +5487,117 @@ class TestTwoLayerConfig:
         )
         r = run_rt("validate", cwd=str(tmp_path))
         assert r.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Smart stage skipping
+# ---------------------------------------------------------------------------
+
+
+class TestSkippedStatus:
+    def _init_run(self, tmp_path):
+        make_config(tmp_path)
+        r = run_rt("init", "--task", "skip test", cwd=str(tmp_path))
+        assert r.returncode == 0
+        return json.loads(r.stdout)["run_id"]
+
+    def test_pending_to_skipped(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt(
+            "transition", "--run-id", run_id,
+            "--stage", "test", "--to", "skipped",
+            cwd=str(tmp_path),
+        )
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert result["from"] == "pending"
+        assert result["to"] == "skipped"
+
+    def test_skipped_is_terminal(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        run_rt("transition", "--run-id", run_id,
+               "--stage", "test", "--to", "skipped", cwd=str(tmp_path))
+        r = run_rt("transition", "--run-id", run_id,
+                    "--stage", "test", "--to", "dispatched", cwd=str(tmp_path))
+        assert r.returncode != 0
+        assert "Invalid transition" in r.stderr
+
+    def test_skipped_does_not_break_dispatched(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt("transition", "--run-id", run_id,
+                    "--stage", "implement", "--to", "dispatched", cwd=str(tmp_path))
+        assert r.returncode == 0
+
+    def test_set_stage_field_updates_state(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        r = run_rt("set-stage-field", "--run-id", run_id,
+                    "--stage", "test", "--field", "skip_reason",
+                    "--value", "docs_only_change", cwd=str(tmp_path))
+        assert r.returncode == 0
+        # Verify in state file
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        assert state["stages"]["test"]["skip_reason"] == "docs_only_change"
+
+    def test_resume_excludes_skipped_from_remaining(self, tmp_path):
+        from datetime import datetime, timedelta, timezone
+
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        # Mark test as skipped, implement as completed
+        state["stages"]["test"]["status"] = "skipped"
+        state["stages"]["test"]["skip_reason"] = "docs_only_change"
+        state["stages"]["implement"]["status"] = "completed"
+        # Make stale
+        past = datetime.now(timezone.utc) - timedelta(minutes=15)
+        state["last_update"] = past.strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        r = run_rt("resume-plan", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        assert "test" not in result["remaining_stages"]
+        assert "test" in result["skipped_stages"]
+        assert "implement" in result["completed_stages"]
+        assert "test" not in result["completed_stages"]
+
+    def test_history_lessons_include_skipped_stages(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["test"]["status"] = "skipped"
+        state["stages"]["test"]["skip_reason"] = "docs_only_change"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        r = run_rt("history", "append", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        skipped = result["lessons"]["skipped_stages"]
+        assert len(skipped) == 1
+        assert skipped[0]["stage"] == "test"
+        assert skipped[0]["reason"] == "docs_only_change"
+
+    def test_report_includes_skip_reason(self, tmp_path):
+        run_id = self._init_run(tmp_path)
+        state_path = tmp_path / ".agenteam" / "state" / f"{run_id}.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["stages"]["test"]["status"] = "skipped"
+        state["stages"]["test"]["skip_reason"] = "docs_only_change"
+        state["stages"]["test"]["skipped_at"] = "2026-04-09T12:00:00Z"
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+
+        r = run_rt("run-report", "--run-id", run_id, cwd=str(tmp_path))
+        assert r.returncode == 0
+        result = json.loads(r.stdout)
+        test_stage = [s for s in result["stages"] if s["name"] == "test"][0]
+        assert test_stage["status"] == "skipped"
+        assert test_stage["skip_reason"] == "docs_only_change"
+        assert test_stage["skipped_at"] == "2026-04-09T12:00:00Z"

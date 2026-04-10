@@ -25,7 +25,7 @@ SAFE_VERIFY_PREFIXES = [
 ]
 
 # Terminal stage states.
-TERMINAL_STATES = {"completed"}
+TERMINAL_STATES = {"completed", "skipped"}
 # Blocking states (non-terminal but not progressing).
 BLOCKING_STATES = {"failed", "rejected", "rework"}
 
@@ -192,10 +192,12 @@ def cmd_resume_plan(args, config: dict) -> None:
     stage_order = [s["name"] for s in pipeline_stages]
 
     completed_stages = [n for n in stage_order if stages.get(n, {}).get("status") == "completed"]
+    skipped_stages = [n for n in stage_order if stages.get(n, {}).get("status") == "skipped"]
+    done_stages = set(completed_stages) | set(skipped_stages)
     remaining_stages = [
         n
         for n in stage_order
-        if n not in completed_stages and (not interrupted_stage or n != interrupted_stage["name"])
+        if n not in done_stages and (not interrupted_stage or n != interrupted_stage["name"])
     ]
 
     result = {
@@ -208,6 +210,7 @@ def cmd_resume_plan(args, config: dict) -> None:
         "config_hash_match": config_hash_match,
         "interrupted_stage": interrupted_stage,
         "completed_stages": completed_stages,
+        "skipped_stages": skipped_stages,
         "remaining_stages": remaining_stages,
     }
 

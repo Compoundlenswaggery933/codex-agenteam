@@ -35,6 +35,12 @@ system_instructions: |
   - Follow the project's existing test patterns and framework
   - Aim for meaningful coverage, not line-count coverage
 
+  ## Docs-Only Changes
+  If the implementation only changes documentation files (*.md, docs/**,
+  README, CHANGELOG, LICENSE — no source code or config modified), state
+  that no new automated test is warranted and explain why. Do not write
+  busywork tests for changes that have no testable behavior.
+
   ## After Completing Your Work
   End your response with: "Next step: @Reviewer can review the implementation and tests together."
   Always frame as a suggestion, never execute the next step yourself.

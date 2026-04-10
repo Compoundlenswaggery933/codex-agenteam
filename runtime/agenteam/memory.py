@@ -71,7 +71,10 @@ def _verify_failure_item(entry: dict, lesson: dict) -> dict:
         summary = f"Stage '{stage}' needed {attempts} verify attempts before passing."
         relevance = "Watch verification coverage and edge cases in this stage."
     else:
-        summary = f"Stage '{stage}' ended with verify result '{final_result}' after {attempts} attempts."
+        summary = (
+            f"Stage '{stage}' ended with verify result "
+            f"'{final_result}' after {attempts} attempts."
+        )
         relevance = "This stage previously failed verification and may need extra attention."
     return {
         "type": "verify_failure",
@@ -92,7 +95,10 @@ def _rework_edge_item(entry: dict, lesson: dict) -> dict:
         "source_run_id": entry["run_id"],
         "stage": from_stage,
         "task": entry.get("task"),
-        "relevance": "This path previously needed rework, so similar changes may hide follow-up fixes.",
+        "relevance": (
+            "This path previously needed rework, so similar changes may hide "
+            "follow-up fixes."
+        ),
     }
 
 
@@ -121,7 +127,10 @@ def _gate_override_item(entry: dict, lesson: dict) -> dict:
         "source_run_id": entry["run_id"],
         "stage": stage,
         "task": entry.get("task"),
-        "relevance": "This stage needed manual override logic before, so automated criteria may still be brittle.",
+        "relevance": (
+            "This stage needed manual override logic before, so automated "
+            "criteria may still be brittle."
+        ),
     }
 
 

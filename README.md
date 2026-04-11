@@ -27,6 +27,10 @@ Restart Codex, go to **Plugins > Local Plugins**, install AgenTeam, then:
 @ATeam build my team
 ```
 
+If the role picker does not show `@Architect`, `@Dev`, and the others right
+away, confirm the project has `.codex/agents/*.toml`, then open a new thread
+or restart Codex so it reloads workspace agents.
+
 ---
 
 ## Your Team

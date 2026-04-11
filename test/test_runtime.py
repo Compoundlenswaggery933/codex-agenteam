@@ -338,6 +338,24 @@ class TestTomlGeneration:
         agent = toml_lib.load(str(agent_path))
         assert agent["name"] == "security_auditor"
 
+    def test_generate_uses_config_project_root_when_config_flag_is_set(self, tmp_path):
+        config_dir = tmp_path / ".agenteam"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+        with open(TEMPLATE) as f:
+            config = yaml.safe_load(f)
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        other_cwd = tmp_path / "outside"
+        other_cwd.mkdir()
+
+        r = run_rt("--config", str(config_path), "generate", cwd=str(other_cwd))
+        assert r.returncode == 0
+
+        assert (tmp_path / ".codex" / "agents" / "architect.toml").exists()
+        assert not (other_cwd / ".codex" / "agents" / "architect.toml").exists()
+
 
 # ---------------------------------------------------------------------------
 # Init & state

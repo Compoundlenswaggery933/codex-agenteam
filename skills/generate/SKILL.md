@@ -51,3 +51,7 @@ If custom roles were included, highlight them:
 
 Optionally show a summary of each generated agent's key fields
 (name, model, can_write, participates_in) for user verification.
+
+If the user regenerated agents because roles are missing from the `@` picker,
+tell them to confirm the files now exist under `.codex/agents/` in the current
+project, then open a new thread or restart Codex so it reloads workspace agents.

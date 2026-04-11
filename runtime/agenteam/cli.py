@@ -8,7 +8,7 @@ import yaml
 
 from .artifacts import cmd_artifact_paths
 from .branch import cmd_branch_plan
-from .config import find_config, load_config, load_config_merged_raw
+from .config import find_config, load_config, load_config_merged_raw, resolve_project_root
 from .dispatch import (
     cmd_dispatch,
     cmd_policy_check,
@@ -332,6 +332,8 @@ def main() -> None:
         cfg_arg = args.config if hasattr(args, "config") and args.config else None
         config_path = find_config(cfg_arg)
         config = load_config(config_path)
+        args.config_path = str(config_path)
+        args.project_root = str(resolve_project_root(config_path))
     except (FileNotFoundError, ValueError) as e:
         print(json.dumps({"error": str(e)}), file=sys.stderr)
         sys.exit(1)

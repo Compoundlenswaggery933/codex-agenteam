@@ -66,6 +66,14 @@ Your team is ready! Talk to any role directly:
 Or use @ATeam to run the full pipeline or manage the team.
 ```
 
+After the roster/examples, append:
+
+```
+If the new roles do not show up in the `@` picker right away, first confirm this
+project now has `.codex/agents/*.toml` files, then open a new thread or restart
+Codex to reload workspace agents from `.codex/agents/`.
+```
+
 **For existing projects** (source files detected), append:
 
 ```

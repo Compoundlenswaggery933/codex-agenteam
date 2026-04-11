@@ -74,6 +74,9 @@ python3 <plugin-dir>/runtime/agenteam_rt.py generate
 ```
 
 This creates `.codex/agents/*.toml` for each role. Show the user what was generated.
+If the new roles do not appear in the `@` picker immediately, tell the user to:
+- Confirm the generated files exist under `.codex/agents/` in the current project
+- Open a new thread or restart Codex so it reloads workspace agents from that folder
 
 ### 6. HOTL Detection
 
@@ -134,6 +137,15 @@ collaborators, run @ATeam share-config.
 ```
 
 Do not show this if `.agenteam.team/config.yaml` already exists.
+
+After the roster/examples, add this note when setup created or refreshed local
+agents:
+
+```
+If the new roles do not show up in the `@` picker right away, first confirm this
+project now has `.codex/agents/*.toml` files, then open a new thread or restart
+Codex to reload workspace agents from `.codex/agents/`.
+```
 
 ## Runtime Path Resolution
 

@@ -36,6 +36,10 @@ bash install.sh --local
 2. Go to **Plugins > Local Plugins** and install AgenTeam
 3. Navigate to your project and run `@ATeam build my team`
 
+If the role picker still does not show the new roles, confirm the project now
+contains `.codex/agents/*.toml`, then open a new thread or restart Codex so it
+reloads workspace agents from that folder.
+
 **For teams:** If your repo already has `.agenteam.team/config.yaml` (committed
 by a teammate), AgenTeam detects it automatically — no init needed. Your team's
 pipeline, roles, and stages are shared. Create `.agenteam/config.yaml` only if

